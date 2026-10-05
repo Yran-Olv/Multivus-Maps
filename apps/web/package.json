@@ -1,0 +1,38 @@
+{
+  "name": "@multivus/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@capacitor/app": "^7.1.0",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/geolocation": "^7.1.5",
+    "@capacitor/network": "^7.0.2",
+    "@multivus/map-core": "workspace:*",
+    "@multivus/offline": "workspace:*",
+    "@multivus/services": "workspace:*",
+    "@multivus/shared": "workspace:*",
+    "@multivus/ui": "workspace:*",
+    "@tanstack/react-query": "^5.90.2",
+    "maplibre-gl": "^5.7.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router": "^7.9.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.3",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
+    "vite-plugin-pwa": "^1.0.3"
+  }
+}

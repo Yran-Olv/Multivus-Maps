@@ -1,0 +1,22 @@
+{
+  "name": "@multivus/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@multivus/map-core": "workspace:*",
+    "@node-rs/argon2": "^2.0.2",
+    "drizzle-orm": "^0.44.5",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.5",
+    "typescript": "^5.9.2"
+  }
+}

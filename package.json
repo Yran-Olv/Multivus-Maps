@@ -1,0 +1,29 @@
+{
+  "name": "multivus-maps",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.4.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @multivus/api --filter @multivus/web dev",
+    "build": "pnpm -r --filter \"./packages/*\" build && pnpm --filter @multivus/api build && pnpm --filter @multivus/web build",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "db:migrate": "tsx packages/database/src/migrate.ts",
+    "db:seed": "tsx packages/database/src/seed.ts",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.22",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.44.0",
+    "vitest": "^3.2.4"
+  }
+}

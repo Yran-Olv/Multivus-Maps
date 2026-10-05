@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+dist
+.git
+apps/web/dev-dist
+apps/web/android
+apps/web/ios
+**/*.pdf
+.env
+.env.*
+*.log
+coverage

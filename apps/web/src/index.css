@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@source "../../../packages/ui/src";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #0e141b;
+  color: #f4f7f8;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+.maplibregl-ctrl-top-right {
+  top: 5.5rem;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}

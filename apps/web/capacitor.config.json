@@ -1,0 +1,8 @@
+{
+  "appId": "br.com.multivus.maps",
+  "appName": "Multivus Maps",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

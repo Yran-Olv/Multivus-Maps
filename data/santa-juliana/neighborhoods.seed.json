@@ -1,0 +1,136 @@
+{
+  "source": "Prefeitura Santa Juliana",
+  "sourceDate": "2021-07",
+  "sourceDocument": "MAPA SantaJuliana.pdf",
+  "note": "Bairros identificados por rótulo no mapa. Sem polígono: o PDF não é georreferenciado.",
+  "neighborhoods": [
+    {
+      "name": "Centro",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Nossa Senhora de Fátima",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "J.K.",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Ordália Borges",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Residencial Horácio Ferreira da Cunha",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Condomínio dos Estados",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Nossa Senhora das Dores",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Palmeiras",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Pôr do Sol",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "São Judas Tadeu",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Santa Felicidade",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "José Rodrigues",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Dr. Waldir Borges da Silva",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Novo Horizonte",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Alvaro Garrucha",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    },
+    {
+      "name": "Manoel Ferreira",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "active": true
+    }
+  ]
+}

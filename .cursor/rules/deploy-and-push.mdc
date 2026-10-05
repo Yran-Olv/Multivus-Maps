@@ -1,0 +1,15 @@
+---
+description: Depois de cada alteração, publicar em produção e enviar ao GitHub
+alwaysApply: true
+---
+
+# Publicar e enviar
+
+Quando uma alteração neste projeto estiver pronta:
+
+1. Publicar em produção em https://maps.multivus.com.br. O código no servidor fica em `/opt/multivus-maps` e sobe com `docker compose -f docker-compose.prod.yml up -d --build`.
+2. Conferir o fluxo alterado no site público.
+3. Criar o commit.
+4. Fazer push para `https://github.com/Yran-Olv/Multivus-Maps.git` na branch `main`.
+
+Não incluir `.env`, senhas ou segredos. Não usar `push --force`. Não alterar a configuração do Git.

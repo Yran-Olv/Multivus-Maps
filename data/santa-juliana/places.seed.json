@@ -1,0 +1,438 @@
+{
+  "source": "Prefeitura Santa Juliana",
+  "sourceDate": "2021-07",
+  "sourceDocument": "MAPA SantaJuliana.pdf",
+  "note": "Equipamentos e praças nomeados no mapa. Latitude e longitude nulas até conferência em campo.",
+  "places": [
+    {
+      "name": "Praça Umbelina Rodrigues Ferreira",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Igreja Santa Juliana de Falconieri",
+      "category": "igreja",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Cônego Lázaro Noel de Camargo",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "UBS Cônego Lázaro",
+      "category": "saude",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Igreja Nossa Senhora das Dores",
+      "category": "igreja",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Igreja São Judas Tadeu",
+      "category": "igreja",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Nossa Senhora Aparecida",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Antônio Fortunato da Silva",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": [
+        {
+          "alias": "Antônio Coelho",
+          "aliasType": "POPULAR_NAME"
+        }
+      ]
+    },
+    {
+      "name": "Praça Santo Expedito",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Tristão da Cunha",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Dr. Helvecio da Cunha",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Brasil",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Genésio Carneiro",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Nilson Borges de Andrade",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Rosalina Tarcísio dos Santos",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Pedro Alves Borges",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça José Binga",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Pio XII",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Praça Pai João",
+      "category": "praca",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "E.T.E.",
+      "category": "saneamento",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Asilo",
+      "category": "publico",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Parque de Exposições",
+      "category": "publico",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Escola Municipal Manoel Ferreira da Cunha",
+      "category": "escola",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "E.E. Santa Juliana",
+      "category": "escola",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Terminal Rodoviário",
+      "category": "transporte",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Estádio Nicanor Borges de Andrade",
+      "category": "esporte",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "E.M. Maria Eugênia Naves",
+      "category": "escola",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Prefeitura Municipal",
+      "category": "publico",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Câmara Municipal",
+      "category": "publico",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Hospital",
+      "category": "saude",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Cemitério",
+      "category": "publico",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "UBS Geraldo Afonso",
+      "category": "saude",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "3º Batalhão",
+      "category": "publico",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Poliesportivo Abraão Lucas de Araújo",
+      "category": "esporte",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Ginásio Antônio Batista de Oliveira",
+      "category": "esporte",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": [
+        {
+          "alias": "Tiola",
+          "aliasType": "POPULAR_NAME"
+        }
+      ]
+    },
+    {
+      "name": "UBS Terezinha Lacerda",
+      "category": "saude",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Quadra da Cidadania",
+      "category": "esporte",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Biblioteca Municipal",
+      "category": "publico",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "E.E. Ana do Carmo",
+      "category": "escola",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Creche Moralinda da Silva Oliveira",
+      "category": "escola",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "Córrego Capão da Erva",
+      "category": "hidrografia",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    },
+    {
+      "name": "BR-452",
+      "category": "rodovia",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "latitude": null,
+      "longitude": null,
+      "aliases": []
+    }
+  ]
+}

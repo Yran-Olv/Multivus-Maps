@@ -1,0 +1,1509 @@
+{
+  "city": "Santa Juliana",
+  "state": "MG",
+  "source": "Prefeitura Santa Juliana",
+  "sourceDate": "2021-07",
+  "sourceDocument": "MAPA SantaJuliana.pdf",
+  "note": "Nomes lidos do mapa oficial de 07/2021. Geometria ausente de propósito: o PDF não é georreferenciado.",
+  "streets": [
+    {
+      "officialName": "Rua Hélio Antônio da Cunha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Bernardes de Castro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Virmondes Teófilo Carneiro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Odília Cândida de Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "D. Odília",
+          "aliasType": "POPULAR_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Verônica Rosa de Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Erasmo Ferreira Rodrigues",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Álvaro José da Silva",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Américo",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Zé Mixica",
+          "aliasType": "POPULAR_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Albino Teófilo Carneiro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Anália Sanches da Silva",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Leonardo Basso",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Maria Helena de Freitas Carneiro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Renilda Maria da Silva Ferreira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Eliana Torres",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Espanha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Alemanha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Inglaterra",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Canadá",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Portugal",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Holanda",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Estados Unidos",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Suíça",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Irlanda",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Itália",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Noruega",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Egito",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Orivaldo José Pires",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Lírios",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Elmar Goulart de Andrade",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Girassóis",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Antonio Gonçalves da Cunha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Violetas",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Euripedes Patrocinio de Morais",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Orquídeas",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Ezio Borges de Souza",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Hortênsias",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Adelaide Maria Ribeiro do Prado",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Jasmins",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Joaquim Naves Tito",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Jacarandás",
+          "aliasType": "OLD_NAME"
+        },
+        {
+          "alias": "Maranhão",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Geraldo Inácio da Silva",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Vieira da Mota",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Jovelino Cândido Mota",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Antonio Ferreira Neto",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Ipês",
+          "aliasType": "OLD_NAME"
+        },
+        {
+          "alias": "Antonio Carteiro",
+          "aliasType": "POPULAR_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Cleonaldo Clemente",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Acácias",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Lucilia Cintra Castro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Cedros",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Maria Abadia Messias",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Cerejeiras",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua José Ferreira de Paiva",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Gameleira",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Nicanor Jonas de Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Palmeiras",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Nigrim Carneiro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Pau Brasil",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Jesus Rosa Ferreira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Rio de Janeiro",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Ana Borges de Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "São Paulo",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Fabio Miranda de Menezes",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Minas Gerais",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Marcos Antonio de Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Paineiras",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua João Marques de Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": [
+        {
+          "alias": "Aroeiras",
+          "aliasType": "OLD_NAME"
+        }
+      ]
+    },
+    {
+      "officialName": "Rua Luíza Rodrigues Portela",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Catarina Maria Ferreira da Cunha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Antônio Horácio Ferreira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Carmem Carneiro Rodrigues",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Ferreira Neto",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Sebastiana Maria de Rezende",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Sebastião Olímpio de Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Marcelo José de Castro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Maria Gertrudes de Moura",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Elzira Portela",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Cristóforo de Paula Rodrigues",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Professor José C. Menezes",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua São Vicente de Paula",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Lucas Ferreira da Cunha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Inácio Paes Leme",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Prof. Maria Teixeira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Professor Orestes",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Gregoriano Canedo",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Padre Lázaro Menezes",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Teotônio da Cunha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Miguel Abdanur",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Nelson José da Silva",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Olímpio Pedro Borges",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua João Evangelista de Castro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Mozart Portela Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Pacheco",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Miguel Abud",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Miguel Bento de Castro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Antônio Ferreira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Goulart",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Sagrado Coração de Jesus",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua João Batista Faria",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Pedro Borges",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Antonio Vieira da Rocha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Fernando Portela",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Tiradentes",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Pracinha Honório Vieira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Júlio César da Silva",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua João E. de Castro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Antônio Resende",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Padre Artur Samuel",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Gérson Boaventura",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua 26 de Outubro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Almeida Júnior",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Miguel Árabe",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Pedro José de Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Juvenil Tarcísio dos Santos",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Antônio Martins do Prado",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Jerônimo Afonso do Prado",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua NSra. Aparecida",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Helvécio de Pádua Castro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Elias José Martins",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Anderson Sebastião de Oliveira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Santa Terezinha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Mário Hélio da Silva",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua João Pereira Cardoso",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Pedro Alves Borges",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Vereador Geraldo Espindula",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Edson Vieira da Rocha",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Tia Nana",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Waldemar José Carneiro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Teodoro Filho",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Décio Carlos da Silva",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Jovelino G. da Costa",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Maria T. Jesus",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Machado de Assis",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Maria de Lurdes Silva",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Antônio Manoel Borges",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Maria Augusta Gonçalves",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Virgilio Antônio Teixeira",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Dr. Norival Borges de Andrade",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Luciano Naves",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Leonidio Carneiro Espindula",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Virgilato Borges",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua José Binga",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua da Prosperidade",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua da Fortuna",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua da Paz",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua da Liberdade",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua da Sucesso",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua da Luz",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua da Harmonia",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua da Sinceridade",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Modesto do Prado",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Rodrigo Dib Carneiro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Bartolomeu de Castro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Azarias Severino Carneiro",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua Geralda Maria dos Santos",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua A",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua B",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Rua C",
+      "streetType": "RUA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Beco da Etelvina",
+      "streetType": "BECO",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Alameda Vitória Régia",
+      "streetType": "ALAMEDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida Maria do Prado Silva",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida Geraldo Miguel Árabe",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida Vereador Sebastião Camilo Carneiro",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida José Totofo",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida João Severino Gonçalves",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida Augusto Terêncio",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida Antônio Fortunato da Silva",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida João Antônio de Oliveira",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida Ennio Gonçalves",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida Joaquim Honório da Silva",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida João S. Gonçalves",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    },
+    {
+      "officialName": "Avenida da Saudade",
+      "streetType": "AVENIDA",
+      "source": "Prefeitura Santa Juliana",
+      "sourceDate": "2021-07",
+      "verified": false,
+      "geometry": null,
+      "aliases": []
+    }
+  ]
+}
