@@ -40,9 +40,11 @@ export interface ShareService {
   share(input: { title: string; text: string; url?: string }): Promise<'shared' | 'copied' | 'cancelled'>
 }
 
+export type ExternalMapApp = 'google' | 'waze' | 'apple'
+
 export type NavigationStart =
   | { status: 'centered'; latitude: number; longitude: number }
-  | { status: 'external' }
+  | { status: 'external'; app?: ExternalMapApp }
   | { status: 'missing_coordinates' }
 
 export interface NavigationService {
@@ -50,7 +52,16 @@ export interface NavigationService {
     label: string
     latitude: number | null
     longitude: number | null
+    app?: ExternalMapApp
   }): Promise<NavigationStart>
+  openExternalMap(
+    app: ExternalMapApp,
+    input: {
+      label: string
+      latitude: number | null
+      longitude: number | null
+    },
+  ): Promise<boolean>
 }
 
 type CapacitorGlobal = {

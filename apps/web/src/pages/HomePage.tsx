@@ -1,4 +1,4 @@
-import { formatShareText, UnconfiguredRoutingProvider } from '@multivus/map-core'
+import { createRoutingProvider, formatShareText, type RouteCalculationResult } from '@multivus/map-core'
 import { enqueueOperation } from '@multivus/offline'
 import type { CorrectionType } from '@multivus/shared'
 import {
@@ -19,7 +19,11 @@ import { flushPending, isUuid } from '../lib/sync'
 import { useCatalog } from '../hooks/use-catalog'
 import { useUi } from '../stores/ui'
 
-const routing = new UnconfiguredRoutingProvider()
+const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+const routing = createRoutingProvider({
+  provider: env?.VITE_ROUTING_PROVIDER || 'osrm',
+  osrmBaseUrl: env?.VITE_OSRM_BASE_URL || 'https://router.project-osrm.org',
+})
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -38,9 +42,11 @@ export function HomePage() {
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [goMessage, setGoMessage] = useState<string | null>(null)
+  const [activeRoute, setActiveRoute] = useState<RouteCalculationResult | null>(null)
 
   useEffect(() => {
     setGoMessage(null)
+    setActiveRoute(null)
   }, [selected?.id])
 
   useEffect(() => {
@@ -76,12 +82,41 @@ export function HomePage() {
   async function go() {
     if (!selected) return
     const place = [selected.title, number].filter(Boolean).join(', ')
-    if (selected.latitude !== null && selected.longitude !== null && location) {
-      await routing.calculateRoute(
-        { latitude: location.latitude, longitude: location.longitude },
+
+    if (!selected.verified || selected.latitude === null || selected.longitude === null) {
+      setGoMessage('Esta via ainda não possui geometria verificada no Multivus Maps. Escolha um mapa externo abaixo.')
+      return
+    }
+
+    let userPos = location
+    if (!userPos) {
+      try {
+        userPos = await platform.location.getCurrentPosition()
+        useUi.getState().setLocation(userPos)
+      } catch {
+        // Fallback para o centro urbano de Santa Juliana se GPS não estiver disponível
+        userPos = { latitude: -19.30889, longitude: -47.52417 }
+      }
+    }
+
+    setGoMessage('Calculando rota OSRM...')
+    try {
+      const routeResult = await routing.calculateRoute(
+        { latitude: userPos.latitude, longitude: userPos.longitude },
         { latitude: selected.latitude, longitude: selected.longitude },
       )
+
+      if (routeResult.status === 'ok' && routeResult.geometry) {
+        setActiveRoute(routeResult)
+        mapRef.current?.fitBounds(routeResult.geometry.coordinates)
+        setGoMessage(`Rota calculada: ${(routeResult.distance / 1000).toFixed(1)} km (~${Math.max(1, Math.round(routeResult.duration / 60))} min)`)
+        return
+      }
+    } catch (error) {
+      console.warn('Erro ao calcular rota OSRM:', error)
     }
+
+    // Se falhar o cálculo OSRM, abre navegação nativa externa
     const result = await platform.navigation.startNavigation({
       label: place,
       latitude: selected.latitude,
@@ -92,11 +127,17 @@ export function HomePage() {
       setGoMessage('Ponto centralizado. A rota também abriu no mapa do celular.')
       return
     }
-    if (result.status === 'external') {
-      setGoMessage('Esta rua ainda não tem ponto conferido no Multivus. Abri o mapa do celular com o nome atual.')
-      return
-    }
-    setGoMessage('Não foi possível abrir o mapa do celular.')
+    setGoMessage('Rota externa iniciada no aplicativo do dispositivo.')
+  }
+
+  async function openExternal(app?: 'google' | 'waze' | 'apple') {
+    if (!selected) return
+    const place = [selected.title, number].filter(Boolean).join(', ')
+    await platform.navigation.openExternalMap(app || 'google', {
+      label: place,
+      latitude: selected.latitude,
+      longitude: selected.longitude,
+    })
   }
 
   async function save() {
@@ -198,6 +239,7 @@ export function HomePage() {
         handle={mapRef}
         className="h-full w-full"
         lines={lines}
+        routeLine={activeRoute?.geometry}
         points={points}
         userLocation={location}
         onClick={correctionOpen ? (point) => setPin(point) : undefined}
@@ -225,16 +267,31 @@ export function HomePage() {
           source={selected.source}
           sourceDate={selected.sourceDate}
           verified={selected.verified}
+          hasGeometry={Boolean(selected.verified && selected.latitude !== null && selected.longitude !== null)}
           streetNumber={number}
           onStreetNumber={(value) => useUi.getState().setNumber(value)}
-          onClose={() => useUi.getState().setSelected(null)}
+          onClose={() => {
+            useUi.getState().setSelected(null)
+            setActiveRoute(null)
+          }}
           onGo={() => void go()}
+          onOpenExternal={(app) => void openExternal(app)}
           onSave={() => void save()}
           onShare={() => void share()}
           onAddReference={() => navigate(`/entregas?referencia=${encodeURIComponent(selected.title)}`)}
           onAddPhoto={() => navigate(`/entregas?foto=1&referencia=${encodeURIComponent(selected.title)}`)}
           onReport={openCorrection}
           goMessage={goMessage}
+          activeRouteSummary={
+            activeRoute?.status === 'ok'
+              ? {
+                  distanceKm: activeRoute.distance / 1000,
+                  durationMin: Math.max(1, Math.round(activeRoute.duration / 60)),
+                  nextInstruction: activeRoute.steps[0]?.instruction,
+                }
+              : null
+          }
+          onClearRoute={() => setActiveRoute(null)}
         />
       ) : null}
       <MapCorrectionModal

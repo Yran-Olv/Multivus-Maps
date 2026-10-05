@@ -29,6 +29,22 @@ const point = customType<{ data: string | null }>({
 export const userRole = pgEnum('user_role', ['ADMIN', 'EDITOR', 'DELIVERY_DRIVER', 'USER'])
 export const aliasType = pgEnum('alias_type', ['OLD_NAME', 'POPULAR_NAME', 'ABBREVIATION', 'OTHER'])
 export const direction = pgEnum('segment_direction', ['BOTH', 'FORWARD', 'BACKWARD'])
+export const neighborhoodStatus = pgEnum('neighborhood_status', ['PENDING', 'CONFIRMED'])
+export const matchType = pgEnum('match_type', [
+  'MATCH_EXACT',
+  'MATCH_ALIAS',
+  'MATCH_FUZZY',
+  'CONFLICT',
+  'NEW_STREET',
+  'UNRESOLVED',
+])
+export const importRecordStatus = pgEnum('import_record_status', [
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'CONFLICT',
+  'MERGED',
+])
 export const restrictionType = pgEnum('restriction_type', [
   'NO_LEFT',
   'NO_RIGHT',
@@ -88,6 +104,11 @@ export const streets = pgTable('streets', {
   normalizedName: text('normalized_name').notNull(),
   streetType: text('street_type').notNull(),
   geometry: geometry('geometry'),
+  geometrySource: text('geometry_source'),
+  geometrySourceDate: text('geometry_source_date'),
+  geometryVerified: boolean('geometry_verified').notNull().default(false),
+  neighborhoodStatus: neighborhoodStatus('neighborhood_status').notNull().default('PENDING'),
+  neighborhoodSource: text('neighborhood_source'),
   source: text('source').notNull(),
   sourceDate: text('source_date'),
   verified: boolean('verified').notNull().default(false),
@@ -105,6 +126,7 @@ export const streetAliases = pgTable('street_aliases', {
   alias: text('alias').notNull(),
   normalizedAlias: text('normalized_alias').notNull(),
   aliasType: aliasType('alias_type').notNull(),
+  active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex('street_aliases_unique').on(table.streetId, table.normalizedAlias, table.aliasType),
@@ -130,6 +152,8 @@ export const streetSegments = pgTable('street_segments', {
   streetId: uuid('street_id').notNull().references(() => streets.id, { onDelete: 'cascade' }),
   geometry: geometry('geometry'),
   direction: direction('direction').notNull().default('BOTH'),
+  verified: boolean('verified').notNull().default(false),
+  source: text('source'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -141,7 +165,44 @@ export const turnRestrictions = pgTable('turn_restrictions', {
   restrictionType: restrictionType('restriction_type').notNull(),
   description: text('description'),
   geometryPoint: point('geometry_point'),
+  verified: boolean('verified').notNull().default(false),
+  source: text('source'),
   active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const addressPoints = pgTable('address_points', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  streetId: uuid('street_id').notNull().references(() => streets.id, { onDelete: 'cascade' }),
+  number: text('number').notNull(),
+  geometry: point('geometry'),
+  source: text('source').notNull().default('Conferência local'),
+  sourceDate: text('source_date'),
+  verified: boolean('verified').notNull().default(false),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  verifiedBy: uuid('verified_by').references(() => users.id),
+  confidenceScore: integer('confidence_score').notNull().default(70),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex('address_points_street_number_unique').on(table.streetId, table.number),
+])
+
+export const osmImportRecords = pgTable('osm_import_records', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  batchName: text('batch_name').notNull(),
+  osmId: text('osm_id'),
+  sourceName: text('source_name').notNull(),
+  normalizedSourceName: text('normalized_source_name').notNull(),
+  streetType: text('street_type'),
+  geometry: geometry('geometry').notNull(),
+  multivusStreetId: uuid('multivus_street_id').references(() => streets.id, { onDelete: 'set null' }),
+  matchType: matchType('match_type').notNull(),
+  score: integer('score').notNull().default(0),
+  status: importRecordStatus('status').notNull().default('PENDING'),
+  conflicts: jsonb('conflicts'),
+  tags: jsonb('tags'),
+  reviewedBy: uuid('reviewed_by').references(() => users.id),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -253,6 +314,67 @@ export const refreshTokens = pgTable('refresh_tokens', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const landmarks = pgTable('landmarks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  cityId: uuid('city_id').notNull().references(() => cities.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  normalizedName: text('normalized_name').notNull(),
+  category: text('category').notNull(),
+  aliases: jsonb('aliases').notNull().default('[]'),
+  streetId: uuid('street_id').references(() => streets.id, { onDelete: 'set null' }),
+  streetNumber: text('street_number'),
+  neighborhoodId: uuid('neighborhood_id').references(() => neighborhoods.id, { onDelete: 'set null' }),
+  address: text('address'),
+  description: text('description'),
+  latitude: doublePrecision('latitude'),
+  longitude: doublePrecision('longitude'),
+  geometry: point('geometry'),
+  verified: boolean('verified').notNull().default(false),
+  confidenceScore: integer('confidence_score').notNull().default(70),
+  active: boolean('active').notNull().default(true),
+  ...timestamps,
+})
+
+export const localReferences = pgTable('local_references', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  cityId: uuid('city_id').notNull().references(() => cities.id, { onDelete: 'cascade' }),
+  popularPhrase: text('popular_phrase').notNull(),
+  normalizedPhrase: text('normalized_phrase').notNull(),
+  relationType: text('relation_type').notNull().default('ON_STREET'),
+  targetStreetId: uuid('target_street_id').references(() => streets.id, { onDelete: 'cascade' }),
+  landmarkId: uuid('landmark_id').references(() => landmarks.id, { onDelete: 'set null' }),
+  description: text('description'),
+  confirmationsCount: integer('confirmations_count').notNull().default(1),
+  confidenceScore: integer('confidence_score').notNull().default(70),
+  verified: boolean('verified').notNull().default(false),
+  submittedBy: uuid('submitted_by').references(() => users.id, { onDelete: 'set null' }),
+  active: boolean('active').notNull().default(true),
+  ...timestamps,
+})
+
+export const collaborationConfirmations = pgTable('collaboration_confirmations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  entityType: text('entity_type').notNull(),
+  entityId: uuid('entity_id').notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  deviceId: text('device_id'),
+  confirmationType: text('confirmation_type').notNull().default('CONFIRM'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const searchAnalytics = pgTable('search_analytics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  query: text('query').notNull(),
+  normalizedQuery: text('normalized_query').notNull(),
+  matchedKind: text('matched_kind'),
+  matchedId: uuid('matched_id'),
+  matchedAlias: text('matched_alias'),
+  usedOldName: boolean('used_old_name').notNull().default(false),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const schema = {
   cities,
   users,
@@ -262,7 +384,13 @@ export const schema = {
   streetNameHistory,
   streetSegments,
   turnRestrictions,
+  addressPoints,
+  osmImportRecords,
   places,
+  landmarks,
+  localReferences,
+  collaborationConfirmations,
+  searchAnalytics,
   deliveryLocations,
   mapCorrections,
   favorites,
@@ -273,3 +401,4 @@ export const schema = {
 }
 
 export const geoJsonColumn = sql`ST_AsGeoJSON(geometry)::json`
+

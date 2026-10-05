@@ -4,10 +4,17 @@ import rateLimit from '@fastify/rate-limit'
 import { createDatabase, refreshTokens, users, type Database } from '@multivus/database'
 import { can, roleSchema, type Action, type Role } from '@multivus/shared'
 import {
+  approveGeometrySchema,
+  confirmEntitySchema,
+  confirmNeighborhoodSchema,
+  createAddressPointSchema,
   createAliasSchema,
   createCorrectionSchema,
   createDeliveryLocationSchema,
   createFavoriteSchema,
+  createFromOsmSchema,
+  createLandmarkSchema,
+  createLocalReferenceSchema,
   createNeighborhoodSchema,
   createPlaceSchema,
   createSegmentSchema,
@@ -15,6 +22,9 @@ import {
   createTurnRestrictionSchema,
   createUserSchema,
   loginSchema,
+  markConflictSchema,
+  mergeStreetSchema,
+  rejectGeometrySchema,
   reviewCorrectionSchema,
   searchQuerySchema,
   syncBatchSchema,
@@ -28,35 +38,51 @@ import { ZodError } from 'zod'
 import type { AppConfig } from './config'
 import {
   adminStats,
+  approveOsmGeometry,
+  confirmEntity,
+  confirmStreetNeighborhood,
+  createAddressPoint,
   createAlias,
   createCorrection,
   createDelivery,
   createFavorite,
+  createLandmark,
+  createLocalReference,
   createNeighborhood,
   createPlace,
   createRestriction,
   createSegment,
   createStreet,
+  createStreetFromOsm,
   createUser,
+  deactivateAlias,
   deactivateStreet,
   deleteFavorite,
   getStreet,
+  listAddressPoints,
   listAudit,
   listCities,
   listCorrections,
   listDeliveries,
   listFavorites,
+  listLandmarks,
+  listLocalReferences,
   listNeighborhoods,
+  listOsmImportRecords,
   listPlaces,
   listRecent,
   listStreets,
+  markOsmConflict,
+  mergeStreetWithOsm,
   rememberSearch,
   recordSync,
+  rejectOsmGeometry,
   reviewCorrection,
   searchCatalog,
   storeRefresh,
   updateStreet,
 } from './domain'
+
 import { verifyPassword } from './lib/passwords'
 import { hashToken, readAccessToken, readRefreshToken, signAccessToken, signRefreshToken } from './lib/tokens'
 
@@ -183,6 +209,35 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   app.get('/api/v1/cities', async () => ({ cities: await listCities(app.db) }))
   app.get('/api/v1/neighborhoods', async () => ({ neighborhoods: await listNeighborhoods(app.db) }))
   app.get('/api/v1/places', async () => ({ places: await listPlaces(app.db) }))
+
+  app.get('/api/v1/landmarks', async (request) => {
+    const query = request.query as { category?: string }
+    return { landmarks: await listLandmarks(app.db, query.category) }
+  })
+  app.post('/api/v1/landmarks', async (request, reply) => {
+    const body = createLandmarkSchema.parse(request.body)
+    const user = await readUser(request, config.accessSecret)
+    const landmark = await createLandmark(app.db, body, user?.id ?? null)
+    return reply.code(201).send({ landmark })
+  })
+
+  app.get('/api/v1/local-references', async () => ({
+    references: await listLocalReferences(app.db),
+  }))
+  app.post('/api/v1/local-references', async (request, reply) => {
+    const body = createLocalReferenceSchema.parse(request.body)
+    const user = await readUser(request, config.accessSecret)
+    const reference = await createLocalReference(app.db, body, user?.id ?? null)
+    return reply.code(201).send({ reference })
+  })
+
+  app.post('/api/v1/confirm', async (request, reply) => {
+    const body = confirmEntitySchema.parse(request.body)
+    const user = await readUser(request, config.accessSecret)
+    const result = await confirmEntity(app.db, body, user?.id ?? null)
+    return reply.code(200).send({ result })
+  })
+
   app.get('/api/v1/streets', async (request) => {
     const query = request.query as { inactive?: string }
     const user = await readUser(request, config.accessSecret)
@@ -295,6 +350,21 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
     const alias = await createAlias(app.db, body, request.authUser!.id)
     return reply.code(201).send({ alias })
   })
+  app.delete('/api/v1/street-aliases/:id', { preHandler: requireAction('street:write') }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const deactivated = await deactivateAlias(app.db, id, request.authUser!.id)
+    if (!deactivated) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Alias não encontrado' } })
+    return { ok: true, alias: deactivated }
+  })
+  app.get('/api/v1/streets/:id/address-points', async (request) => {
+    const { id } = request.params as { id: string }
+    return { addressPoints: await listAddressPoints(app.db, id) }
+  })
+  app.post('/api/v1/address-points', { preHandler: requireAction('street:write') }, async (request, reply) => {
+    const body = createAddressPointSchema.parse(request.body)
+    const point = await createAddressPoint(app.db, body, request.authUser!.id)
+    return reply.code(201).send({ point })
+  })
   app.post('/api/v1/street-segments', { preHandler: requireAction('street:write') }, async (request, reply) => {
     const body = createSegmentSchema.parse(request.body)
     const segment = await createSegment(app.db, body, request.authUser!.id)
@@ -314,6 +384,42 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
     const body = createPlaceSchema.parse(request.body)
     const place = await createPlace(app.db, body, request.authUser!.id)
     return reply.code(201).send({ place })
+  })
+
+  // Endpoints administrativos de conferência cartográfica
+  app.get('/api/v1/admin/cartography/osm-preview', { preHandler: requireAction('street:write') }, async (request) => {
+    const query = request.query as { batch?: string }
+    return { records: await listOsmImportRecords(app.db, query.batch || 'santa-juliana') }
+  })
+  app.post('/api/v1/admin/cartography/approve-geometry', { preHandler: requireAction('street:write') }, async (request, reply) => {
+    const body = approveGeometrySchema.parse(request.body)
+    const street = await approveOsmGeometry(app.db, body, request.authUser!.id)
+    return reply.code(200).send({ street })
+  })
+  app.post('/api/v1/admin/cartography/reject-geometry', { preHandler: requireAction('street:write') }, async (request, reply) => {
+    const body = rejectGeometrySchema.parse(request.body)
+    const record = await rejectOsmGeometry(app.db, body, request.authUser!.id)
+    return reply.code(200).send({ record })
+  })
+  app.post('/api/v1/admin/cartography/merge-street', { preHandler: requireAction('street:write') }, async (request, reply) => {
+    const body = mergeStreetSchema.parse(request.body)
+    const street = await mergeStreetWithOsm(app.db, body, request.authUser!.id)
+    return reply.code(200).send({ street })
+  })
+  app.post('/api/v1/admin/cartography/create-from-osm', { preHandler: requireAction('street:write') }, async (request, reply) => {
+    const body = createFromOsmSchema.parse(request.body)
+    const street = await createStreetFromOsm(app.db, body, request.authUser!.id)
+    return reply.code(201).send({ street })
+  })
+  app.post('/api/v1/admin/cartography/mark-conflict', { preHandler: requireAction('street:write') }, async (request, reply) => {
+    const body = markConflictSchema.parse(request.body)
+    const record = await markOsmConflict(app.db, body, request.authUser!.id)
+    return reply.code(200).send({ record })
+  })
+  app.post('/api/v1/admin/cartography/confirm-neighborhood', { preHandler: requireAction('street:write') }, async (request, reply) => {
+    const body = confirmNeighborhoodSchema.parse(request.body)
+    const street = await confirmStreetNeighborhood(app.db, body, request.authUser!.id)
+    return reply.code(200).send({ street })
   })
 
   app.get('/api/v1/admin/stats', { preHandler: requireAction('audit:read') }, async () => ({

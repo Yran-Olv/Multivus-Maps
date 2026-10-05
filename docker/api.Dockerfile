@@ -10,6 +10,7 @@ COPY packages/database/package.json packages/database/package.json
 COPY packages/offline/package.json packages/offline/package.json
 COPY packages/services/package.json packages/services/package.json
 COPY packages/ui/package.json packages/ui/package.json
+COPY packages/map-import/package.json packages/map-import/package.json
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm --filter @multivus/api build

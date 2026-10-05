@@ -1,21 +1,26 @@
+import landmarkSeed from '@data/santa-juliana/landmarks.seed.json'
+import referenceSeed from '@data/santa-juliana/local-references.seed.json'
 import neighborhoodSeed from '@data/santa-juliana/neighborhoods.seed.json'
 import placeSeed from '@data/santa-juliana/places.seed.json'
 import streetSeed from '@data/santa-juliana/streets.seed.json'
 import { normalizeAddress } from '@multivus/map-core'
-import type { LocalNeighborhood, LocalPlace, LocalStreet } from '@multivus/offline'
+import type { LocalLandmark, LocalNeighborhood, LocalPlace, LocalReference, LocalStreet } from '@multivus/offline'
 import { api } from './api'
 import { db } from './db'
 
-const SEED_VERSION = 'santa-juliana-2021-07'
+const SEED_VERSION = 'santa-juliana-2026-10-v2'
 
 export async function ensureSeed(): Promise<void> {
   const current = await db.kv.get('seedVersion')
   if (current?.value === SEED_VERSION && (await db.streets.count()) > 0) return
   const source = await db.kv.get('catalogSource')
   if (source?.value === 'api') return
-  await db.transaction('rw', db.streets, db.places, db.neighborhoods, db.kv, async () => {
+  await db.transaction('rw', [db.streets, db.places, db.landmarks, db.localReferences, db.neighborhoods, db.kv], async () => {
     await db.streets.clear()
+
     await db.places.clear()
+    await db.landmarks.clear()
+    await db.localReferences.clear()
     await db.neighborhoods.clear()
     await db.streets.bulkAdd(
       streetSeed.streets.map((street) => ({
@@ -50,6 +55,38 @@ export async function ensureSeed(): Promise<void> {
         source: place.source,
       })),
     )
+    await db.landmarks.bulkAdd(
+      landmarkSeed.landmarks.map((lm) => ({
+        id: `seed:${normalizeAddress(lm.name)}`,
+        name: lm.name,
+        category: lm.category,
+        aliases: lm.aliases ?? [],
+        streetId: null,
+        streetNumber: lm.streetNumber ?? null,
+        neighborhoodName: null,
+        address: lm.address ?? null,
+        description: lm.description ?? null,
+        latitude: lm.latitude ?? null,
+        longitude: lm.longitude ?? null,
+        verified: lm.verified ?? false,
+        confidence: lm.confidenceScore ?? 70,
+      })),
+    )
+    await db.localReferences.bulkAdd(
+      referenceSeed.references.map((ref) => ({
+        id: `seed:${normalizeAddress(ref.popularPhrase)}`,
+        popularPhrase: ref.popularPhrase,
+        relationType: ref.relationType,
+        targetStreetId: ref.targetStreetName ? `seed:${normalizeAddress(ref.targetStreetName)}` : null,
+        targetStreetName: ref.targetStreetName ?? null,
+        landmarkId: ref.landmarkName ? `seed:${normalizeAddress(ref.landmarkName)}` : null,
+        landmarkName: ref.landmarkName ?? null,
+        description: ref.description ?? null,
+        confirmationsCount: ref.confirmationsCount ?? 1,
+        confidence: ref.confidenceScore ?? 70,
+        verified: ref.verified ?? false,
+      })),
+    )
     await db.kv.put({ key: 'seedVersion', value: SEED_VERSION })
     await db.kv.put({ key: 'catalogSource', value: 'seed' })
   })
@@ -58,25 +95,34 @@ export async function ensureSeed(): Promise<void> {
 export async function readCatalog(): Promise<{
   streets: LocalStreet[]
   places: LocalPlace[]
+  landmarks: LocalLandmark[]
+  localReferences: LocalReference[]
   neighborhoods: LocalNeighborhood[]
 }> {
-  const [streets, places, neighborhoods] = await Promise.all([
+  const [streets, places, landmarks, localReferences, neighborhoods] = await Promise.all([
     db.streets.orderBy('officialName').toArray(),
     db.places.orderBy('name').toArray(),
+    db.landmarks.orderBy('name').toArray(),
+    db.localReferences.orderBy('popularPhrase').toArray(),
     db.neighborhoods.orderBy('name').toArray(),
   ])
-  return { streets, places, neighborhoods }
+  return { streets, places, landmarks, localReferences, neighborhoods }
 }
 
 export async function refreshCatalogFromApi(): Promise<void> {
-  const [streetBody, placeBody, neighborhoodBody] = await Promise.all([
+  const [streetBody, placeBody, landmarkBody, refBody, neighborhoodBody] = await Promise.all([
     api<{ streets: ApiStreet[] }>('/api/v1/streets'),
     api<{ places: ApiPlace[] }>('/api/v1/places'),
+    api<{ landmarks: ApiLandmark[] }>('/api/v1/landmarks'),
+    api<{ references: ApiReference[] }>('/api/v1/local-references'),
     api<{ neighborhoods: ApiNeighborhood[] }>('/api/v1/neighborhoods'),
   ])
-  await db.transaction('rw', db.streets, db.places, db.neighborhoods, db.kv, async () => {
+  await db.transaction('rw', [db.streets, db.places, db.landmarks, db.localReferences, db.neighborhoods, db.kv], async () => {
     await db.streets.clear()
+
     await db.places.clear()
+    await db.landmarks.clear()
+    await db.localReferences.clear()
     await db.neighborhoods.clear()
     await db.streets.bulkAdd(
       streetBody.streets.map((street) => ({
@@ -104,6 +150,38 @@ export async function refreshCatalogFromApi(): Promise<void> {
         source: place.source,
       })),
     )
+    await db.landmarks.bulkAdd(
+      landmarkBody.landmarks.map((lm) => ({
+        id: lm.id,
+        name: lm.name,
+        category: lm.category,
+        aliases: lm.aliases ?? [],
+        streetId: lm.streetId ?? null,
+        streetNumber: lm.streetNumber ?? null,
+        neighborhoodName: lm.neighborhoodName ?? null,
+        address: lm.address ?? null,
+        description: lm.description ?? null,
+        latitude: lm.latitude,
+        longitude: lm.longitude,
+        verified: lm.verified,
+        confidence: lm.confidenceScore ?? 70,
+      })),
+    )
+    await db.localReferences.bulkAdd(
+      refBody.references.map((ref) => ({
+        id: ref.id,
+        popularPhrase: ref.popularPhrase,
+        relationType: ref.relationType,
+        targetStreetId: ref.targetStreetId ?? null,
+        targetStreetName: ref.targetStreetName ?? null,
+        landmarkId: ref.landmarkId ?? null,
+        landmarkName: ref.landmarkName ?? null,
+        description: ref.description ?? null,
+        confirmationsCount: ref.confirmationsCount ?? 1,
+        confidence: ref.confidenceScore ?? 70,
+        verified: ref.verified,
+      })),
+    )
     await db.neighborhoods.bulkAdd(
       neighborhoodBody.neighborhoods.map((neighborhood) => ({
         id: neighborhood.id,
@@ -113,6 +191,37 @@ export async function refreshCatalogFromApi(): Promise<void> {
     await db.kv.put({ key: 'catalogSource', value: 'api' })
   })
 }
+
+type ApiLandmark = {
+  id: string
+  name: string
+  category: string
+  aliases: string[]
+  streetId: string | null
+  streetNumber: string | null
+  neighborhoodName: string | null
+  address: string | null
+  description: string | null
+  latitude: number | null
+  longitude: number | null
+  verified: boolean
+  confidenceScore: number
+}
+
+type ApiReference = {
+  id: string
+  popularPhrase: string
+  relationType: string
+  targetStreetId: string | null
+  targetStreetName: string | null
+  landmarkId: string | null
+  landmarkName: string | null
+  description: string | null
+  confirmationsCount: number
+  confidenceScore: number
+  verified: boolean
+}
+
 
 type ApiStreet = {
   id: string

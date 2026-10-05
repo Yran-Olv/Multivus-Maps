@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 export type SelectedPlace = {
   id: string
-  kind: 'street' | 'place' | 'neighborhood'
+  kind: 'street' | 'place' | 'landmark' | 'reference' | 'neighborhood'
   title: string
   neighborhoodName: string | null
   oldNames: string[]
@@ -17,7 +17,10 @@ export type SelectedPlace = {
   verified: boolean
   latitude: number | null
   longitude: number | null
+  targetStreetName?: string | null
+  landmarkName?: string | null
 }
+
 
 type UiState = {
   online: boolean

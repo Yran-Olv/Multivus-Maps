@@ -13,6 +13,9 @@
     "test": "vitest run",
     "db:migrate": "tsx packages/database/src/migrate.ts",
     "db:seed": "tsx packages/database/src/seed.ts",
+    "map:import": "tsx packages/map-import/src/cli.ts import",
+    "map:preview": "tsx packages/map-import/src/cli.ts preview",
+    "map:apply": "tsx packages/map-import/src/cli.ts apply",
     "format": "prettier --write ."
   },
   "devDependencies": {

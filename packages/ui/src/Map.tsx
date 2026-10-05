@@ -15,17 +15,24 @@ export type MapPoint = {
 export type MapLine = {
   id: string
   coordinates: [number, number][]
+  color?: string
+  name?: string
 }
 
 export type MapHandle = {
   flyTo: (longitude: number, latitude: number, zoom?: number) => void
+  fitBounds: (coordinates: [number, number][]) => void
   getCenter: () => { longitude: number; latitude: number }
   resize: () => void
 }
 
 type MapProps = {
   lines?: MapLine[]
+  osmLines?: MapLine[]
+  routeLine?: { coordinates: [number, number][] } | null
   points?: MapPoint[]
+  showMultivus?: boolean
+  showOsm?: boolean
   userLocation?: { longitude: number; latitude: number } | null
   onClick?: (point: { longitude: number; latitude: number }) => void
   onMove?: (center: { longitude: number; latitude: number }) => void
@@ -42,7 +49,19 @@ function webglAvailable(): boolean {
   }
 }
 
-export function Map({ lines = [], points = [], userLocation, onClick, onMove, className, handle }: MapProps) {
+export function Map({
+  lines = [],
+  osmLines = [],
+  routeLine = null,
+  points = [],
+  showMultivus = true,
+  showOsm = true,
+  userLocation,
+  onClick,
+  onMove,
+  className,
+  handle,
+}: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const onClickRef = useRef(onClick)
@@ -54,6 +73,26 @@ export function Map({ lines = [], points = [], userLocation, onClick, onMove, cl
   useImperativeHandle(handle, () => ({
     flyTo(longitude, latitude, zoom = 16) {
       mapRef.current?.flyTo({ center: [longitude, latitude], zoom })
+    },
+    fitBounds(coordinates: [number, number][]) {
+      if (!coordinates.length || !mapRef.current) return
+      let minLng = Infinity
+      let minLat = Infinity
+      let maxLng = -Infinity
+      let maxLat = -Infinity
+      for (const [lng, lat] of coordinates) {
+        if (lng < minLng) minLng = lng
+        if (lng > maxLng) maxLng = lng
+        if (lat < minLat) minLat = lat
+        if (lat > maxLat) maxLat = lat
+      }
+      mapRef.current.fitBounds(
+        [
+          [minLng, minLat],
+          [maxLng, maxLat],
+        ],
+        { padding: 60, maxZoom: 17, duration: 1000 },
+      )
     },
     getCenter() {
       const center = mapRef.current?.getCenter()
@@ -91,7 +130,25 @@ export function Map({ lines = [], points = [], userLocation, onClick, onMove, cl
       if (/webgl|context/i.test(message)) setUnavailable(true)
     })
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+
     map.on('load', () => {
+      // 1. Camada de linhas OSM (Base Cartográfica)
+      map.addSource('osm-lines', {
+        type: 'geojson',
+        data: emptyCollection(),
+      })
+      map.addLayer({
+        id: 'osm-lines-line',
+        type: 'line',
+        source: 'osm-lines',
+        paint: {
+          'line-color': ['coalesce', ['get', 'color'], '#a855f7'],
+          'line-width': 4.5,
+          'line-opacity': 0.85,
+        },
+      })
+
+      // 2. Camada Multivus Local (Ruas cadastradas)
       map.addSource('multivus-local', {
         type: 'geojson',
         data: emptyCollection(),
@@ -101,10 +158,38 @@ export function Map({ lines = [], points = [], userLocation, onClick, onMove, cl
         type: 'line',
         source: 'multivus-local',
         paint: {
-          'line-color': '#f0b429',
+          'line-color': ['coalesce', ['get', 'color'], '#f0b429'],
           'line-width': 4,
+          'line-opacity': 0.9,
         },
       })
+
+      // 3. Camada de Rota Ativa (Navigation Route)
+      map.addSource('route-line', {
+        type: 'geojson',
+        data: emptyCollection(),
+      })
+      map.addLayer({
+        id: 'route-line-casing',
+        type: 'line',
+        source: 'route-line',
+        paint: {
+          'line-color': '#1d4ed8',
+          'line-width': 8,
+          'line-opacity': 0.8,
+        },
+      })
+      map.addLayer({
+        id: 'route-line-core',
+        type: 'line',
+        source: 'route-line',
+        paint: {
+          'line-color': '#38bdf8',
+          'line-width': 5,
+        },
+      })
+
+      // 4. Camada de Pontos
       map.addSource('multivus-points', {
         type: 'geojson',
         data: emptyCollection(),
@@ -121,6 +206,7 @@ export function Map({ lines = [], points = [], userLocation, onClick, onMove, cl
         },
       })
     })
+
     map.on('click', (event) => {
       onClickRef.current?.({ longitude: event.lngLat.lng, latitude: event.lngLat.lat })
     })
@@ -135,22 +221,81 @@ export function Map({ lines = [], points = [], userLocation, onClick, onMove, cl
     }
   }, [])
 
+  // Atualização da camada Multivus
   useEffect(() => {
     const map = mapRef.current
     const source = map?.getSource('multivus-local') as GeoJSONSource | undefined
-    source?.setData({
+    if (!source) return
+
+    if (!showMultivus) {
+      source.setData(emptyCollection())
+      return
+    }
+
+    source.setData({
       type: 'FeatureCollection',
       features: lines
         .filter((line) => line.coordinates.length >= 2)
         .map((line) => ({
           type: 'Feature' as const,
           id: line.id,
-          properties: {},
+          properties: { color: line.color ?? '#f0b429', name: line.name },
           geometry: { type: 'LineString' as const, coordinates: line.coordinates },
         })),
     })
-  }, [lines])
+  }, [lines, showMultivus])
 
+  // Atualização da camada OSM
+  useEffect(() => {
+    const map = mapRef.current
+    const source = map?.getSource('osm-lines') as GeoJSONSource | undefined
+    if (!source) return
+
+    if (!showOsm) {
+      source.setData(emptyCollection())
+      return
+    }
+
+    source.setData({
+      type: 'FeatureCollection',
+      features: osmLines
+        .filter((line) => line.coordinates.length >= 2)
+        .map((line) => ({
+          type: 'Feature' as const,
+          id: line.id,
+          properties: { color: line.color ?? '#a855f7', name: line.name },
+          geometry: { type: 'LineString' as const, coordinates: line.coordinates },
+        })),
+    })
+  }, [osmLines, showOsm])
+
+  // Atualização da Rota Ativa
+  useEffect(() => {
+    const map = mapRef.current
+    const source = map?.getSource('route-line') as GeoJSONSource | undefined
+    if (!source) return
+
+    if (!routeLine || routeLine.coordinates.length < 2) {
+      source.setData(emptyCollection())
+      return
+    }
+
+    source.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: routeLine.coordinates,
+          },
+        },
+      ],
+    })
+  }, [routeLine])
+
+  // Atualização dos Pontos e Localização do Usuário
   useEffect(() => {
     const map = mapRef.current
     const source = map?.getSource('multivus-points') as GeoJSONSource | undefined

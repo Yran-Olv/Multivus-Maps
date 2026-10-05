@@ -42,6 +42,12 @@ export function SearchPage() {
         subtitle: hit.subtitle,
         warning: hit.warning,
         meta: 'Santa Juliana - MG',
+        oldNames: hit.oldNames,
+        usedOldName: hit.usedOldName,
+        matchedAlias: hit.matchedAlias,
+        neighborhoodName: hit.neighborhoodName,
+        confidence: hit.confidence,
+        verified: hit.verified,
       }))
 
   async function select(hit: AddressHit) {
@@ -82,10 +88,16 @@ export function SearchPage() {
   )
 }
 
-function toRecords(catalog: { streets: Array<{ id: string; officialName: string; streetType: string; neighborhoodName: string | null; verified: boolean; source: string | null; sourceDate: string | null; geometry: unknown; aliases: { alias: string; aliasType: string }[]; confidence?: number | null }>; places: Array<{ id: string; name: string; description: string | null; latitude: number | null; longitude: number | null; verified: boolean; source: string | null }>; neighborhoods: Array<{ id: string; name: string }> } | undefined): SearchableRecord[] {
+function toRecords(catalog: {
+  streets?: Array<{ id: string; officialName: string; streetType: string; neighborhoodName: string | null; verified: boolean; source: string | null; sourceDate: string | null; geometry: unknown; aliases: { alias: string; aliasType: string }[]; confidence?: number | null }>
+  places?: Array<{ id: string; name: string; description: string | null; latitude: number | null; longitude: number | null; verified: boolean; source: string | null }>
+  landmarks?: Array<{ id: string; name: string; category: string; aliases: string[]; streetId: string | null; streetNumber: string | null; neighborhoodName: string | null; address: string | null; description: string | null; latitude: number | null; longitude: number | null; verified: boolean; confidence: number }>
+  localReferences?: Array<{ id: string; popularPhrase: string; relationType: string; targetStreetId: string | null; targetStreetName: string | null; landmarkId: string | null; landmarkName: string | null; description: string | null; confirmationsCount: number; confidence: number; verified: boolean }>
+  neighborhoods?: Array<{ id: string; name: string }>
+} | undefined): SearchableRecord[] {
   if (!catalog) return []
   return [
-    ...catalog.streets.map((street) => {
+    ...(catalog.streets ?? []).map((street) => {
       const point = pointOf(street.geometry)
       return {
         id: street.id,
@@ -103,7 +115,34 @@ function toRecords(catalog: { streets: Array<{ id: string; officialName: string;
         longitude: point?.longitude ?? null,
       }
     }),
-    ...catalog.places.map((place) => ({
+    ...(catalog.landmarks ?? []).map((lm) => ({
+      id: lm.id,
+      kind: 'landmark' as const,
+      title: lm.name,
+      category: lm.category,
+      neighborhoodName: lm.neighborhoodName,
+      verified: lm.verified,
+      confidence: lm.confidence,
+      latitude: lm.latitude,
+      longitude: lm.longitude,
+      targetStreetId: lm.streetId,
+      aliases: (lm.aliases ?? []).map((alias) => ({ alias, aliasType: 'POPULAR_NAME' })),
+      extraText: lm.description,
+    })),
+    ...(catalog.localReferences ?? []).map((ref) => ({
+      id: ref.id,
+      kind: 'reference' as const,
+      title: ref.popularPhrase,
+      relationType: ref.relationType,
+      targetStreetId: ref.targetStreetId,
+      targetStreetName: ref.targetStreetName,
+      landmarkId: ref.landmarkId,
+      landmarkName: ref.landmarkName,
+      verified: ref.verified,
+      confidence: ref.confidence,
+      extraText: ref.description,
+    })),
+    ...(catalog.places ?? []).map((place) => ({
       id: place.id,
       kind: 'place' as const,
       title: place.name,
@@ -113,7 +152,7 @@ function toRecords(catalog: { streets: Array<{ id: string; officialName: string;
       latitude: place.latitude,
       longitude: place.longitude,
     })),
-    ...catalog.neighborhoods.map((neighborhood) => ({
+    ...(catalog.neighborhoods ?? []).map((neighborhood) => ({
       id: neighborhood.id,
       kind: 'neighborhood' as const,
       title: neighborhood.name,
@@ -122,6 +161,7 @@ function toRecords(catalog: { streets: Array<{ id: string; officialName: string;
   ]
 }
 
+
 function toHit(result: SearchResult): AddressHit {
   return {
     id: result.id,
@@ -129,74 +169,90 @@ function toHit(result: SearchResult): AddressHit {
     subtitle: result.subtitle,
     warning: result.warning,
     meta: 'Santa Juliana - MG',
+    oldNames: result.oldNames,
+    usedOldName: result.usedOldName,
+    matchedAlias: result.matchedAlias,
+    neighborhoodName: result.neighborhoodName,
+    confidence: result.confidence,
+    verified: result.verified,
   }
 }
 
 function fromRanked(hit: RankedHit, query: string): SelectedPlace {
   const parsed = parseAddressText(query)
   const point = pointOf(hit.geometry)
+  const isReference = hit.kind === 'reference'
   return {
-    id: hit.id,
-    kind: hit.kind,
-    title: hit.title,
+    id: isReference && hit.targetStreetId ? hit.targetStreetId : hit.id,
+    kind: isReference ? 'street' : hit.kind,
+    title: isReference && hit.targetStreetName ? hit.targetStreetName : hit.title,
     neighborhoodName: hit.neighborhoodName ?? null,
     oldNames: hit.oldNames,
     usedOldName: hit.usedOldName,
     warning: hit.warning,
     confidence: hit.confidence,
     customerInput: query.trim() || null,
-    matchedAlias: hit.matchedAlias,
-    reference: parsed.reference,
+    matchedAlias: isReference ? hit.title : hit.matchedAlias,
+    reference: isReference ? (hit.extraText ?? parsed.reference) : parsed.reference,
     source: hit.source ?? null,
     sourceDate: hit.sourceDate ?? null,
     verified: hit.verified,
     latitude: hit.latitude ?? point?.latitude ?? null,
     longitude: hit.longitude ?? point?.longitude ?? null,
+    targetStreetName: hit.targetStreetName ?? null,
+    landmarkName: hit.landmarkName ?? null,
   }
 }
 
 function fromRecord(record: SearchableRecord, query: string): SelectedPlace {
   const parsed = parseAddressText(query)
   const point = pointOf(record.geometry)
+  const isReference = record.kind === 'reference'
   return {
-    id: record.id,
-    kind: record.kind,
-    title: record.title,
+    id: isReference && record.targetStreetId ? record.targetStreetId : record.id,
+    kind: isReference ? 'street' : record.kind,
+    title: isReference && record.targetStreetName ? record.targetStreetName : record.title,
     neighborhoodName: record.neighborhoodName ?? null,
     oldNames: [],
     usedOldName: false,
     warning: null,
     confidence: record.confidence ?? (record.verified ? 100 : record.source ? 70 : 0),
     customerInput: query.trim() || null,
-    matchedAlias: null,
+    matchedAlias: isReference ? record.title : null,
     reference: parsed.reference,
     source: record.source ?? null,
     sourceDate: record.sourceDate ?? null,
     verified: record.verified,
     latitude: record.latitude ?? point?.latitude ?? null,
     longitude: record.longitude ?? point?.longitude ?? null,
+    targetStreetName: record.targetStreetName ?? null,
+    landmarkName: record.landmarkName ?? null,
   }
 }
 
 function fromRemote(result: SearchResult, query: string): SelectedPlace {
   const parsed = parseAddressText(query)
   const point = pointOf(result.geometry)
+  const isReference = result.kind === 'reference'
   return {
-    id: result.id,
-    kind: result.kind,
-    title: result.title,
+    id: isReference && result.targetStreetId ? result.targetStreetId : result.id,
+    kind: isReference ? 'street' : result.kind,
+    title: isReference && result.targetStreetName ? result.targetStreetName : result.title,
     neighborhoodName: result.neighborhoodName,
     oldNames: result.oldNames,
     usedOldName: result.usedOldName,
     warning: result.warning,
     confidence: result.confidence,
     customerInput: query.trim() || null,
-    matchedAlias: result.matchedAlias,
+    matchedAlias: isReference ? result.title : result.matchedAlias,
     reference: parsed.reference,
     source: result.source,
     sourceDate: result.sourceDate,
     verified: result.verified,
     latitude: result.latitude ?? point?.latitude ?? null,
     longitude: result.longitude ?? point?.longitude ?? null,
+    targetStreetName: result.targetStreetName ?? null,
+    landmarkName: result.landmarkName ?? null,
   }
 }
+

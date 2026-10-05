@@ -80,4 +80,72 @@ describe('entender endereço', () => {
     expect(titles.has('Rua Lírios')).toBe(false)
     expect(titles.has('Rua Orivaldo José Pires')).toBe(true)
   })
+
+  it('atende ao requisito 25: variações de Lírios e Orivaldo resolvem para Rua Orivaldo José Pires', () => {
+    const variations = [
+      'Rua Lírios',
+      'Lírios',
+      'Rua Lirios',
+      'Liros',
+      'Orivaldo Jose',
+      'Rua Orivaldo José Pires',
+    ]
+    for (const query of variations) {
+      const resolved = resolveAddress(records(), query)
+      expect(resolved.officialName, `Falha na query: ${query}`).toBe('Rua Orivaldo José Pires')
+    }
+  })
+
+  it('atende ao requisito 25: "Rua Lírios 120, casa azul" retorna dados completos', () => {
+    const resolved = resolveAddress(records(), 'Rua Lírios 120, casa azul')
+    expect(resolved.officialName).toBe('Rua Orivaldo José Pires')
+    expect(resolved.number).toBe('120')
+    expect(resolved.matchedAlias).toBe('Rua Lírios')
+    expect(resolved.usedOldName).toBe(true)
+    expect(resolved.reference).toContain('casa azul')
+  })
+
+  it('resolve referências populares como "rua do hospital" ou "atrás da rodoviária"', () => {
+    const customRecords: SearchableRecord[] = [
+      ...records(),
+      {
+        id: 'ref-hospital',
+        kind: 'reference',
+        title: 'Rua do Hospital',
+        verified: true,
+        targetStreetId: normalizeAddress('Rua São Vicente de Paula'),
+        targetStreetName: 'Rua São Vicente de Paula',
+      },
+      {
+        id: 'ref-bioklin',
+        kind: 'reference',
+        title: 'Rua da Bioklin',
+        verified: true,
+        targetStreetId: normalizeAddress('Rua São Vicente de Paula'),
+        targetStreetName: 'Rua São Vicente de Paula',
+      },
+      {
+        id: 'landmark-igreja',
+        kind: 'landmark',
+        title: 'Igreja Matriz',
+        category: 'igreja',
+        verified: true,
+        aliases: [{ alias: 'igreja', aliasType: 'POPULAR_NAME' }],
+      },
+    ]
+
+    const resolvedHospital = resolveAddress(customRecords, 'Rua do Hospital')
+    expect(resolvedHospital.officialName).toBe('Rua São Vicente de Paula')
+    expect(resolvedHospital.matchedReference).toBe('Rua do Hospital')
+
+    const resolvedBioklin = resolveAddress(customRecords, 'Entrega na rua da bioklin 55')
+    expect(resolvedBioklin.officialName).toBe('Rua São Vicente de Paula')
+    expect(resolvedBioklin.number).toBe('55')
+
+    const resolvedWithLandmark = resolveAddress(customRecords, 'Rua Lírios 120, perto da igreja')
+    expect(resolvedWithLandmark.officialName).toBe('Rua Orivaldo José Pires')
+    expect(resolvedWithLandmark.number).toBe('120')
+    expect(resolvedWithLandmark.matchedLandmark).toBe('Igreja Matriz')
+  })
 })
+

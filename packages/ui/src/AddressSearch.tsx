@@ -6,6 +6,12 @@ export type AddressHit = {
   subtitle?: string | null
   warning?: string | null
   meta?: string | null
+  oldNames?: string[]
+  usedOldName?: boolean
+  matchedAlias?: string | null
+  neighborhoodName?: string | null
+  confidence?: number
+  verified?: boolean
 }
 
 type AddressSearchProps = {
@@ -94,12 +100,57 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function Hit({ hit, onSelect }: { hit: AddressHit; onSelect: (hit: AddressHit) => void }) {
+  const hasOld = hit.oldNames && hit.oldNames.length > 0
+  const confidence = hit.confidence ?? (hit.verified ? 100 : 70)
+  const isHighConfidence = confidence >= 90
+
   return (
-    <button type="button" className="block w-full border-b border-white/5 px-4 py-4 text-left last:border-b-0" onClick={() => onSelect(hit)}>
-      <span className="block text-lg font-medium">{hit.title}</span>
-      {hit.subtitle ? <span className="mt-1 block text-sm text-amber-200">{hit.subtitle}</span> : null}
-      {hit.warning ? <span className="mt-1 block text-sm text-amber-100">⚠️ {hit.warning}</span> : null}
-      {hit.meta ? <span className="mt-1 block text-sm text-slate-400">{hit.meta}</span> : null}
+    <button
+      type="button"
+      className="block w-full border-b border-white/5 px-4 py-4 text-left transition hover:bg-white/5 last:border-b-0"
+      onClick={() => onSelect(hit)}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-lg font-medium text-white">{hit.title}</span>
+        {hit.verified ? (
+          <span className="shrink-0 rounded-md bg-teal-500/20 px-2 py-0.5 text-xs font-medium text-teal-300">
+            Verificada
+          </span>
+        ) : null}
+      </div>
+
+      {hit.usedOldName ? (
+        <div className="mt-1 flex items-center gap-1.5 text-sm font-medium text-amber-300">
+          <span>🔄</span>
+          <span>Antiga {hit.matchedAlias ?? hit.subtitle?.replace(/^🔄\s*Antiga:\s*/, '')}</span>
+        </div>
+      ) : hasOld ? (
+        <p className="mt-1 text-sm text-slate-300">
+          Também conhecida como: <span className="text-amber-200">{hit.oldNames?.join(', ')}</span>
+        </p>
+      ) : hit.subtitle && hit.subtitle !== hit.neighborhoodName ? (
+        <p className="mt-1 text-sm text-amber-200">{hit.subtitle}</p>
+      ) : null}
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+        <span>Bairro: {hit.neighborhoodName || <span className="italic text-slate-500">Não confirmado</span>}</span>
+        <span>•</span>
+        <span className={isHighConfidence ? 'text-teal-400 font-medium' : 'text-amber-400/90 font-medium'}>
+          Confiança: {confidence}/100
+        </span>
+        {hit.meta ? (
+          <>
+            <span>•</span>
+            <span>{hit.meta}</span>
+          </>
+        ) : null}
+      </div>
+
+      {hit.warning ? (
+        <p className="mt-2 rounded-lg bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-200">
+          ⚠️ {hit.warning}
+        </p>
+      ) : null}
     </button>
   )
 }

@@ -3,10 +3,13 @@ import {
   ALIAS_TYPES,
   CORRECTION_TYPES,
   DIRECTIONS,
+  LANDMARK_CATEGORIES,
+  RELATION_TYPES,
   RESTRICTION_TYPES,
   ROLES,
   STREET_TYPES,
 } from './constants'
+
 
 export const roleSchema = z.enum(ROLES)
 export const aliasTypeSchema = z.enum(ALIAS_TYPES)
@@ -146,13 +149,104 @@ export const searchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
 })
 
+export const createAddressPointSchema = z.object({
+  streetId: z.string().uuid(),
+  number: z.string().min(1).max(20),
+  latitude: z.number().gte(-90).lte(90),
+  longitude: z.number().gte(-180).lte(180),
+  source: z.string().max(200).optional(),
+})
+
+export const approveGeometrySchema = z.object({
+  streetId: z.string().uuid(),
+  importRecordId: z.string().uuid().optional(),
+  geometry: geoJsonSchema.optional(),
+  source: z.string().max(200).optional(),
+})
+
+export const rejectGeometrySchema = z.object({
+  importRecordId: z.string().uuid(),
+  reason: z.string().max(500).optional(),
+})
+
+export const mergeStreetSchema = z.object({
+  importRecordId: z.string().uuid(),
+  targetStreetId: z.string().uuid(),
+})
+
+export const createFromOsmSchema = z.object({
+  importRecordId: z.string().uuid(),
+  officialName: z.string().min(1).max(200),
+  streetType: streetTypeSchema,
+  neighborhoodId: z.string().uuid().nullable().optional(),
+})
+
+export const markConflictSchema = z.object({
+  importRecordId: z.string().uuid(),
+  notes: z.string().max(500).optional(),
+})
+
+export const confirmNeighborhoodSchema = z.object({
+  streetId: z.string().uuid(),
+  neighborhoodId: z.string().uuid(),
+  source: z.string().max(200).optional(),
+})
+
+export const deactivateAliasSchema = z.object({
+  aliasId: z.string().uuid(),
+})
+
+export const landmarkCategorySchema = z.enum(LANDMARK_CATEGORIES)
+export const relationTypeSchema = z.enum(RELATION_TYPES)
+
+export const createLandmarkSchema = z.object({
+  name: z.string().min(1).max(200),
+  category: landmarkCategorySchema,
+  aliases: z.array(z.string().min(1).max(100)).optional(),
+  streetId: z.string().uuid().nullable().optional(),
+  streetNumber: z.string().max(20).nullable().optional(),
+  neighborhoodId: z.string().uuid().nullable().optional(),
+  address: z.string().max(300).nullable().optional(),
+  description: z.string().max(2000).nullable().optional(),
+  latitude: z.number().gte(-90).lte(90).nullable().optional(),
+  longitude: z.number().gte(-180).lte(180).nullable().optional(),
+})
+
+export const createLocalReferenceSchema = z.object({
+  popularPhrase: z.string().min(2).max(200),
+  relationType: relationTypeSchema.default('ON_STREET'),
+  targetStreetId: z.string().uuid().nullable().optional(),
+  landmarkId: z.string().uuid().nullable().optional(),
+  description: z.string().max(1000).nullable().optional(),
+})
+
+export const confirmEntitySchema = z.object({
+  entityType: z.enum(['street', 'street_alias', 'local_reference', 'landmark', 'map_correction']),
+  entityId: z.string().uuid(),
+  confirmationType: z.enum(['CONFIRM', 'DISPUTE']).default('CONFIRM'),
+  notes: z.string().max(500).nullable().optional(),
+  deviceId: z.string().max(100).nullable().optional(),
+})
+
 export type LoginInput = z.infer<typeof loginSchema>
 export type CreateStreetInput = z.infer<typeof createStreetSchema>
 export type UpdateStreetInput = z.infer<typeof updateStreetSchema>
 export type CreateCorrectionInput = z.infer<typeof createCorrectionSchema>
 export type CreateDeliveryLocationInput = z.infer<typeof createDeliveryLocationSchema>
+export type CreateAddressPointInput = z.infer<typeof createAddressPointSchema>
+export type ApproveGeometryInput = z.infer<typeof approveGeometrySchema>
+export type RejectGeometryInput = z.infer<typeof rejectGeometrySchema>
+export type MergeStreetInput = z.infer<typeof mergeStreetSchema>
+export type CreateFromOsmInput = z.infer<typeof createFromOsmSchema>
+export type MarkConflictInput = z.infer<typeof markConflictSchema>
+export type ConfirmNeighborhoodInput = z.infer<typeof confirmNeighborhoodSchema>
+export type DeactivateAliasInput = z.infer<typeof deactivateAliasSchema>
+export type CreateLandmarkInput = z.infer<typeof createLandmarkSchema>
+export type CreateLocalReferenceInput = z.infer<typeof createLocalReferenceSchema>
+export type ConfirmEntityInput = z.infer<typeof confirmEntitySchema>
+
 export type SearchResult = {
-  kind: 'street' | 'place' | 'neighborhood'
+  kind: 'street' | 'place' | 'landmark' | 'reference' | 'neighborhood'
   id: string
   title: string
   subtitle: string | null
@@ -170,4 +264,11 @@ export type SearchResult = {
   usedOldName: boolean
   oldNames: string[]
   confidence: number
+  category?: string | null
+  targetStreetId?: string | null
+  targetStreetName?: string | null
+  landmarkId?: string | null
+  landmarkName?: string | null
+  relationType?: string | null
 }
+

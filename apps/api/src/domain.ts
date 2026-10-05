@@ -1,26 +1,37 @@
 import {
   auditLogs,
   cities,
+  collaborationConfirmations,
   favorites,
+  landmarks,
+  localReferences,
   mapCorrections,
   neighborhoods,
+  osmImportRecords,
   places,
   recentSearches,
   refreshTokens,
+  searchAnalytics,
   streetAliases,
   syncQueue,
   users,
+  streets,
   type Database,
 } from '@multivus/database'
 import { confidenceOf, describeStreet, normalizeAddress, parseAddressText } from '@multivus/map-core'
 import type {
+  ConfirmEntityInput,
+  CreateAddressPointInput,
   CreateCorrectionInput,
   CreateDeliveryLocationInput,
+  CreateLandmarkInput,
+  CreateLocalReferenceInput,
   CreateStreetInput,
   SearchResult,
   UpdateStreetInput,
 } from '@multivus/shared'
 import { and, desc, eq, sql } from 'drizzle-orm'
+
 import { hashPassword } from './lib/passwords'
 import { rowsOf } from './lib/rows'
 import { hashToken } from './lib/tokens'
@@ -55,6 +66,11 @@ const streetSelect = sql`
   s.normalized_name AS "normalizedName",
   s.verified,
   s.confidence_score AS "confidenceScore",
+  s.geometry_source AS "geometrySource",
+  s.geometry_source_date AS "geometrySourceDate",
+  s.geometry_verified AS "geometryVerified",
+  s.neighborhood_status AS "neighborhoodStatus",
+  s.neighborhood_source AS "neighborhoodSource",
   s.source,
   s.source_date AS "sourceDate",
   s.active,
@@ -64,7 +80,7 @@ const streetSelect = sql`
   ST_AsGeoJSON(s.geometry)::json AS geometry,
   COALESCE((
     SELECT json_agg(json_build_object('id', a.id, 'alias', a.alias, 'aliasType', a.alias_type) ORDER BY a.alias)
-    FROM street_aliases a WHERE a.street_id = s.id
+    FROM street_aliases a WHERE a.street_id = s.id AND a.active = true
   ), '[]'::json) AS aliases
 `
 
@@ -109,9 +125,209 @@ export async function listPlaces(db: Database) {
     .orderBy(places.name)
 }
 
-export async function listStreets(db: Database, includeInactive = false) {
+export async function listLandmarks(db: Database, category?: string) {
+  const query = db
+    .select({
+      id: landmarks.id,
+      name: landmarks.name,
+      category: landmarks.category,
+      aliases: landmarks.aliases,
+      streetId: landmarks.streetId,
+      streetNumber: landmarks.streetNumber,
+      neighborhoodId: landmarks.neighborhoodId,
+      address: landmarks.address,
+      description: landmarks.description,
+      latitude: landmarks.latitude,
+      longitude: landmarks.longitude,
+      verified: landmarks.verified,
+      confidenceScore: landmarks.confidenceScore,
+      createdAt: landmarks.createdAt,
+    })
+    .from(landmarks)
+    .where(category ? and(eq(landmarks.active, true), eq(landmarks.category, category)) : eq(landmarks.active, true))
+    .orderBy(landmarks.name)
+
+  return query
+}
+
+export async function createLandmark(
+  db: Database,
+  input: CreateLandmarkInput,
+  userId: string | null,
+) {
+  const city = await db.select({ id: cities.id }).from(cities).limit(1)
+  const cityId = city[0]?.id
+  if (!cityId) throw new Error('Cidade não cadastrada')
+
+  const pointGeo = input.latitude && input.longitude
+    ? sql`ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), 4326)`
+    : null
+
+  const [created] = await db.insert(landmarks).values({
+    cityId,
+    name: input.name,
+    normalizedName: normalizeAddress(input.name),
+    category: input.category,
+    aliases: input.aliases ?? [],
+    streetId: input.streetId ?? null,
+    streetNumber: input.streetNumber ?? null,
+    neighborhoodId: input.neighborhoodId ?? null,
+    address: input.address ?? null,
+    description: input.description ?? null,
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
+    geometry: pointGeo as unknown as string,
+    verified: false,
+    confidenceScore: 70,
+  }).returning()
+
+  await audit(db, {
+    entityType: 'landmark',
+    entityId: created?.id ?? input.name,
+    action: 'create',
+    newData: input,
+    userId,
+  })
+  return created
+}
+
+export async function listLocalReferences(db: Database) {
+  const result = await db.execute<{
+    id: string
+    popularPhrase: string
+    relationType: string
+    targetStreetId: string | null
+    targetStreetName: string | null
+    landmarkId: string | null
+    landmarkName: string | null
+    description: string | null
+    confirmationsCount: number
+    confidenceScore: number
+    verified: boolean
+    createdAt: string
+  }>(sql`
+    SELECT
+      lr.id,
+      lr.popular_phrase AS "popularPhrase",
+      lr.relation_type AS "relationType",
+      lr.target_street_id AS "targetStreetId",
+      s.official_name AS "targetStreetName",
+      lr.landmark_id AS "landmarkId",
+      lm.name AS "landmarkName",
+      lr.description,
+      lr.confirmations_count AS "confirmationsCount",
+      lr.confidence_score AS "confidenceScore",
+      lr.verified,
+      lr.created_at AS "createdAt"
+    FROM local_references lr
+    LEFT JOIN streets s ON s.id = lr.target_street_id
+    LEFT JOIN landmarks lm ON lm.id = lr.landmark_id
+    WHERE lr.active = true
+    ORDER BY lr.confirmations_count DESC, lr.popular_phrase ASC
+  `)
+  return rowsOf(result)
+}
+
+export async function createLocalReference(
+  db: Database,
+  input: CreateLocalReferenceInput,
+  userId: string | null,
+) {
+  const city = await db.select({ id: cities.id }).from(cities).limit(1)
+  const cityId = city[0]?.id
+  if (!cityId) throw new Error('Cidade não cadastrada')
+
+  const [created] = await db.insert(localReferences).values({
+    cityId,
+    popularPhrase: input.popularPhrase,
+    normalizedPhrase: normalizeAddress(input.popularPhrase),
+    relationType: input.relationType,
+    targetStreetId: input.targetStreetId ?? null,
+    landmarkId: input.landmarkId ?? null,
+    description: input.description ?? null,
+    confirmationsCount: 1,
+    confidenceScore: 70,
+    verified: false,
+    submittedBy: userId,
+  }).returning()
+
+  await audit(db, {
+    entityType: 'local_reference',
+    entityId: created?.id ?? input.popularPhrase,
+    action: 'create',
+    newData: input,
+    userId,
+  })
+  return created
+}
+
+export async function confirmEntity(db: Database, input: ConfirmEntityInput, userId: string | null) {
+  await db.insert(collaborationConfirmations).values({
+    entityType: input.entityType,
+    entityId: input.entityId,
+    userId: userId ?? null,
+    deviceId: input.deviceId ?? null,
+    confirmationType: input.confirmationType ?? 'CONFIRM',
+    notes: input.notes ?? null,
+  }).onConflictDoNothing()
+
+  const countRes = await db.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count
+    FROM collaboration_confirmations
+    WHERE entity_type = ${input.entityType}
+      AND entity_id = ${input.entityId}
+      AND confirmation_type = 'CONFIRM'
+  `)
+  const count = rowsOf(countRes)[0]?.count ?? 1
+
+  let newConfidence = 70
+  if (count >= 3) newConfidence = 95
+  else if (count === 2) newConfidence = 85
+
+  if (input.entityType === 'local_reference') {
+    await db.update(localReferences).set({
+      confirmationsCount: count,
+      confidenceScore: newConfidence,
+    }).where(eq(localReferences.id, input.entityId))
+  } else if (input.entityType === 'street') {
+    await db.update(streets).set({
+      confidenceScore: newConfidence,
+    }).where(eq(streets.id, input.entityId))
+  } else if (input.entityType === 'landmark') {
+    await db.update(landmarks).set({
+      confidenceScore: newConfidence,
+    }).where(eq(landmarks.id, input.entityId))
+  }
+
+  return { entityId: input.entityId, confirmationsCount: count, confidenceScore: newConfidence }
+}
+
+
+export type StreetRecord = {
+  id: string
+  officialName: string
+  streetType: string
+  normalizedName: string
+  verified: boolean
+  confidenceScore: number
+  geometrySource: string | null
+  geometrySourceDate: string | null
+  geometryVerified: boolean
+  neighborhoodStatus: string
+  neighborhoodSource: string | null
+  source: string
+  sourceDate: string | null
+  active: boolean
+  notes: string | null
+  neighborhoodId: string | null
+  neighborhoodName: string | null
+  geometry: unknown
+  aliases: Array<{ id: string; alias: string; aliasType: string }>
+}
+
+export async function listStreets(db: Database, includeInactive = false): Promise<StreetRecord[]> {
   const where = includeInactive ? sql`true` : sql`s.active = true`
-  const result = await db.execute(sql`
+  const result = await db.execute<StreetRecord>(sql`
     SELECT ${streetSelect}
     FROM streets s
     LEFT JOIN neighborhoods n ON n.id = s.neighborhood_id
@@ -121,8 +337,8 @@ export async function listStreets(db: Database, includeInactive = false) {
   return rowsOf(result)
 }
 
-export async function getStreet(db: Database, id: string) {
-  const result = await db.execute(sql`
+export async function getStreet(db: Database, id: string): Promise<StreetRecord | null> {
+  const result = await db.execute<StreetRecord>(sql`
     SELECT ${streetSelect}
     FROM streets s
     LEFT JOIN neighborhoods n ON n.id = s.neighborhood_id
@@ -235,6 +451,147 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     LIMIT ${limit}
   `)
 
+  const landmarkResult = await db.execute<{
+    id: string
+    name: string
+    category: string
+    description: string | null
+    latitude: number | null
+    longitude: number | null
+    streetId: string | null
+    streetName: string | null
+    neighborhoodName: string | null
+    verified: boolean
+    confidenceScore: number
+    score: number
+  }>(sql`
+    SELECT
+      l.id,
+      l.name,
+      l.category,
+      l.description,
+      l.latitude,
+      l.longitude,
+      l.street_id AS "streetId",
+      s.official_name AS "streetName",
+      n.name AS "neighborhoodName",
+      l.verified,
+      l.confidence_score AS "confidenceScore",
+      GREATEST(
+        similarity(l.normalized_name, ${term}),
+        similarity(lower(coalesce(l.description, '')), ${term}),
+        similarity(lower(coalesce(l.category, '')), ${term})
+      ) AS score
+    FROM landmarks l
+    LEFT JOIN streets s ON s.id = l.street_id
+    LEFT JOIN neighborhoods n ON n.id = l.neighborhood_id
+    WHERE l.active = true
+      AND (
+        l.normalized_name LIKE ${'%' + term + '%'}
+        OR lower(coalesce(l.description, '')) LIKE ${'%' + term + '%'}
+        OR l.aliases::text ILIKE ${'%' + term + '%'}
+        OR similarity(l.normalized_name, ${term}) > 0.25
+      )
+    ORDER BY score DESC
+    LIMIT ${limit}
+  `)
+
+  const referenceResult = await db.execute<{
+    id: string
+    popularPhrase: string
+    relationType: string
+    targetStreetId: string | null
+    targetStreetName: string | null
+    targetStreetGeometry: unknown
+    landmarkId: string | null
+    landmarkName: string | null
+    description: string | null
+    confirmationsCount: number
+    confidenceScore: number
+    verified: boolean
+    score: number
+  }>(sql`
+    SELECT
+      lr.id,
+      lr.popular_phrase AS "popularPhrase",
+      lr.relation_type AS "relationType",
+      lr.target_street_id AS "targetStreetId",
+      s.official_name AS "targetStreetName",
+      ST_AsGeoJSON(s.geometry)::json AS "targetStreetGeometry",
+      lr.landmark_id AS "landmarkId",
+      lm.name AS "landmarkName",
+      lr.description,
+      lr.confirmations_count AS "confirmationsCount",
+      lr.confidence_score AS "confidenceScore",
+      lr.verified,
+      similarity(lr.normalized_phrase, ${term}) AS score
+    FROM local_references lr
+    LEFT JOIN streets s ON s.id = lr.target_street_id
+    LEFT JOIN landmarks lm ON lm.id = lr.landmark_id
+    WHERE lr.active = true
+      AND (
+        lr.normalized_phrase LIKE ${'%' + term + '%'}
+        OR similarity(lr.normalized_phrase, ${term}) > 0.25
+      )
+    ORDER BY score DESC
+    LIMIT ${limit}
+  `)
+
+  const referenceHits: SearchResult[] = rowsOf(referenceResult).map((row) => ({
+    kind: 'reference' as const,
+    id: row.id,
+    title: row.popularPhrase,
+    subtitle: row.targetStreetName ? `🔗 Referência popular → ${row.targetStreetName}` : '🔗 Referência de entrega',
+    streetType: null,
+    neighborhoodName: null,
+    matchedAlias: row.popularPhrase,
+    matchedAliasType: 'POPULAR_NAME',
+    verified: row.verified,
+    source: 'Colaboração local',
+    sourceDate: null,
+    latitude: null,
+    longitude: null,
+    geometry: row.targetStreetGeometry ?? null,
+    warning: row.targetStreetName
+      ? `Expressão popular utilizada por moradores. Aponta para ${row.targetStreetName}.`
+      : null,
+    usedOldName: false,
+    oldNames: [],
+    confidence: Number(row.confidenceScore) || 80,
+    targetStreetId: row.targetStreetId,
+    targetStreetName: row.targetStreetName,
+    landmarkId: row.landmarkId,
+    landmarkName: row.landmarkName,
+    relationType: row.relationType,
+  }))
+
+  const landmarkHits: SearchResult[] = rowsOf(landmarkResult).map((row) => {
+    const catLabel = row.category ? row.category.charAt(0).toUpperCase() + row.category.slice(1) : 'Ponto de referência'
+    return {
+      kind: 'landmark' as const,
+      id: row.id,
+      title: row.name,
+      subtitle: row.streetName ? `📍 ${catLabel} · ${row.streetName}` : `📍 ${catLabel}`,
+      streetType: null,
+      neighborhoodName: row.neighborhoodName,
+      matchedAlias: null,
+      matchedAliasType: null,
+      verified: row.verified,
+      source: 'Cadastro Municipal / Local',
+      sourceDate: null,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      geometry: null,
+      warning: null,
+      usedOldName: false,
+      oldNames: [],
+      confidence: Number(row.confidenceScore) || 90,
+      category: row.category,
+      targetStreetId: row.streetId,
+      targetStreetName: row.streetName,
+    }
+  })
+
   const streetHits: SearchResult[] = rowsOf(streetsResult).map((row) => {
     const nameScore = Number(row.nameScore)
     const aliasScore = Number(row.aliasScore)
@@ -314,8 +671,33 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     confidence: 0,
   }))
 
-  return [...streetHits, ...placeHits, ...neighborhoodHits].slice(0, limit)
+  const allHits = [
+    ...referenceHits,
+    ...streetHits,
+    ...landmarkHits,
+    ...placeHits,
+    ...neighborhoodHits,
+  ]
+  const topHit = allHits[0] ?? null
+
+  // Aprendizado local: registra o termo buscado e o resultado
+  try {
+    await db.insert(searchAnalytics).values({
+      query: rawQuery,
+      normalizedQuery: term,
+      matchedKind: topHit?.kind ?? null,
+      matchedId: topHit?.id ?? null,
+      matchedAlias: topHit?.matchedAlias ?? null,
+      usedOldName: topHit?.usedOldName ?? false,
+      userId: null,
+    })
+  } catch (err) {
+    console.warn('Aviso: falha ao salvar search analytics:', err)
+  }
+
+  return allHits.slice(0, limit)
 }
+
 
 function aliasList(value: unknown): { alias: string; aliasType: string }[] {
   const parsed = typeof value === 'string' ? JSON.parse(value) as unknown : value
@@ -392,6 +774,8 @@ export async function updateStreet(db: Database, id: string, input: UpdateStreet
   const previous = await getStreet(db, id)
   if (!previous) return null
   const geometry = input.geometry === undefined ? undefined : input.geometry ? JSON.stringify(input.geometry) : null
+  const nameChanged = Boolean(input.officialName && input.officialName.trim() !== previous.officialName)
+
   await db.execute(sql`
     UPDATE streets SET
       official_name = COALESCE(${input.officialName ?? null}, official_name),
@@ -425,17 +809,67 @@ export async function updateStreet(db: Database, id: string, input: UpdateStreet
         WHEN ${geometry === undefined}::boolean THEN geometry
         WHEN ${geometry ?? null}::text IS NULL THEN NULL
         ELSE ST_SetSRID(ST_GeomFromGeoJSON(${geometry ?? null}), 4326)
+      END,
+      geometry_verified = CASE
+        WHEN ${geometry !== undefined && geometry !== null}::boolean THEN true
+        ELSE geometry_verified
+      END,
+      geometry_source = CASE
+        WHEN ${geometry !== undefined && geometry !== null}::boolean THEN COALESCE(${input.source ?? null}, 'Conferência local')
+        ELSE geometry_source
+      END,
+      geometry_source_date = CASE
+        WHEN ${geometry !== undefined && geometry !== null}::boolean THEN to_char(now(), 'YYYY-MM-DD')
+        ELSE geometry_source_date
       END
     WHERE id = ${id}
   `)
+
   if (input.aliases?.length) await insertAliases(db, id, input.aliases)
+
+  // Se o nome oficial mudou: cria histórico, alias antigo e audit log
+  if (nameChanged && input.officialName) {
+    await db.execute(sql`
+      INSERT INTO street_name_history (
+        street_id, old_name, new_name, source, source_date, verified, verified_at, verified_by, confidence_score
+      ) VALUES (
+        ${id}, ${previous.officialName}, ${input.officialName},
+        ${input.source || 'Conferência local'}, to_char(now(), 'YYYY-MM-DD'),
+        true, now(), ${userId}::uuid, 100
+      )
+    `)
+
+    await db.execute(sql`
+      INSERT INTO street_aliases (street_id, alias, normalized_alias, alias_type, active)
+      VALUES (${id}, ${previous.officialName}, ${normalizeAddress(previous.officialName)}, 'OLD_NAME', true)
+      ON CONFLICT (street_id, normalized_alias, alias_type) DO UPDATE SET active = true
+    `)
+
+    await audit(db, {
+      entityType: 'street',
+      entityId: id,
+      action: 'STREET_NAME_CHANGED',
+      previousData: { officialName: previous.officialName },
+      newData: { officialName: input.officialName },
+      userId,
+    })
+  }
+
   if (input.verified === true) {
     await db.execute(sql`
       UPDATE street_name_history
       SET verified = true, verified_at = now(), verified_by = ${userId}::uuid, confidence_score = 100
       WHERE street_id = ${id} AND verified = false
     `)
+    await audit(db, {
+      entityType: 'street',
+      entityId: id,
+      action: 'STREET_GEOMETRY_APPROVED',
+      newData: { verified: true, confidenceScore: 100 },
+      userId,
+    })
   }
+
   const next = await getStreet(db, id)
   await audit(db, {
     entityType: 'street',
@@ -462,10 +896,30 @@ export async function createAlias(
     alias: input.alias,
     normalizedAlias: normalizeAddress(input.alias),
     aliasType: input.aliasType,
+    active: true,
   }).returning()
   await recordOldName(db, input.streetId, input.alias, input.aliasType)
-  await audit(db, { entityType: 'street_alias', entityId: created?.id ?? input.streetId, action: 'create', newData: input, userId })
+  await audit(db, { entityType: 'street_alias', entityId: created?.id ?? input.streetId, action: 'STREET_ALIAS_ADDED', newData: input, userId })
   return created
+}
+
+export async function deactivateAlias(db: Database, aliasId: string, userId: string) {
+  const [updated] = await db
+    .update(streetAliases)
+    .set({ active: false })
+    .where(eq(streetAliases.id, aliasId))
+    .returning()
+  if (updated) {
+    await audit(db, {
+      entityType: 'street_alias',
+      entityId: aliasId,
+      action: 'STREET_ALIAS_REMOVED',
+      previousData: { active: true },
+      newData: { active: false },
+      userId,
+    })
+  }
+  return updated ?? null
 }
 
 export async function createSegment(
@@ -475,16 +929,17 @@ export async function createSegment(
 ) {
   const geometry = input.geometry ? JSON.stringify(input.geometry) : null
   const result = await db.execute<{ id: string }>(sql`
-    INSERT INTO street_segments (street_id, direction, geometry)
+    INSERT INTO street_segments (street_id, direction, geometry, verified, source)
     VALUES (
       ${input.streetId},
       ${input.direction}::segment_direction,
-      CASE WHEN ${geometry}::text IS NULL THEN NULL ELSE ST_SetSRID(ST_GeomFromGeoJSON(${geometry}), 4326) END
+      CASE WHEN ${geometry}::text IS NULL THEN NULL ELSE ST_SetSRID(ST_GeomFromGeoJSON(${geometry}), 4326) END,
+      true, 'Conferência local'
     )
     RETURNING id
   `)
   const id = rowsOf(result)[0]?.id
-  await audit(db, { entityType: 'street_segment', entityId: id ?? input.streetId, action: 'create', newData: input, userId })
+  await audit(db, { entityType: 'street_segment', entityId: id ?? input.streetId, action: 'STREET_DIRECTION_CHANGED', newData: input, userId })
   return { id }
 }
 
@@ -502,7 +957,7 @@ export async function createRestriction(
 ) {
   const result = await db.execute<{ id: string }>(sql`
     INSERT INTO turn_restrictions (
-      from_segment_id, to_segment_id, restriction_type, description, geometry_point, active
+      from_segment_id, to_segment_id, restriction_type, description, geometry_point, verified, source, active
     ) VALUES (
       ${input.fromSegmentId},
       ${input.toSegmentId},
@@ -512,12 +967,286 @@ export async function createRestriction(
         WHEN ${input.latitude ?? null}::float8 IS NULL OR ${input.longitude ?? null}::float8 IS NULL THEN NULL
         ELSE ST_SetSRID(ST_MakePoint(${input.longitude ?? 0}, ${input.latitude ?? 0}), 4326)
       END,
-      true
+      true, 'Conferência local', true
     )
     RETURNING id
   `)
   const id = rowsOf(result)[0]?.id
-  await audit(db, { entityType: 'turn_restriction', entityId: id ?? input.fromSegmentId, action: 'create', newData: input, userId })
+  await audit(db, { entityType: 'turn_restriction', entityId: id ?? input.fromSegmentId, action: 'TURN_RESTRICTION_ADDED', newData: input, userId })
+  return { id }
+}
+
+export async function listOsmImportRecords(db: Database, batchName = 'santa-juliana') {
+  const result = await db.execute(sql`
+    SELECT
+      r.id,
+      r.batch_name AS "batchName",
+      r.osm_id AS "osmId",
+      r.source_name AS "sourceName",
+      r.normalized_source_name AS "normalizedSourceName",
+      r.street_type AS "streetType",
+      ST_AsGeoJSON(r.geometry)::json AS geometry,
+      r.multivus_street_id AS "multivusStreetId",
+      s.official_name AS "multivusOfficialName",
+      r.match_type AS "matchType",
+      r.score,
+      r.status,
+      r.conflicts,
+      r.tags,
+      r.created_at AS "createdAt"
+    FROM osm_import_records r
+    LEFT JOIN streets s ON s.id = r.multivus_street_id
+    WHERE r.batch_name = ${batchName}
+    ORDER BY r.score DESC, r.source_name
+  `)
+  return rowsOf(result)
+}
+
+export async function approveOsmGeometry(
+  db: Database,
+  input: { streetId: string; importRecordId?: string; geometry?: unknown; source?: string },
+  userId: string,
+) {
+  let geom = input.geometry
+  let sourceName = 'OpenStreetMap'
+  let score = 100
+
+  if (input.importRecordId) {
+    const [record] = await db
+      .select()
+      .from(osmImportRecords)
+      .where(eq(osmImportRecords.id, input.importRecordId))
+      .limit(1)
+
+    if (record) {
+      if (!geom) {
+        const geomRes = await db.execute<{ geometry: unknown }>(sql`
+          SELECT ST_AsGeoJSON(geometry)::json AS geometry FROM osm_import_records WHERE id = ${record.id}
+        `)
+        geom = rowsOf(geomRes)[0]?.geometry
+      }
+      sourceName = record.sourceName
+      score = record.score
+      await db
+        .update(osmImportRecords)
+        .set({
+          status: 'APPROVED',
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+        })
+        .where(eq(osmImportRecords.id, record.id))
+    }
+  }
+
+  if (!geom) throw new Error('Geometria não fornecida.')
+  const geomStr = JSON.stringify(geom)
+
+  await db.execute(sql`
+    UPDATE streets SET
+      geometry = ST_SetSRID(ST_GeomFromGeoJSON(${geomStr}), 4326),
+      geometry_source = ${input.source ?? 'OpenStreetMap'},
+      geometry_source_date = to_char(now(), 'YYYY-MM-DD'),
+      geometry_verified = true,
+      verified = true,
+      confidence_score = 100,
+      verified_by = ${userId}::uuid,
+      verified_at = now()
+    WHERE id = ${input.streetId}
+  `)
+
+  await db.execute(sql`
+    INSERT INTO street_segments (street_id, geometry, direction, verified, source)
+    VALUES (${input.streetId}, ST_SetSRID(ST_GeomFromGeoJSON(${geomStr}), 4326), 'BOTH', false, ${input.source ?? 'OpenStreetMap'})
+    ON CONFLICT DO NOTHING
+  `)
+
+  const updated = await getStreet(db, input.streetId)
+  await audit(db, {
+    entityType: 'street',
+    entityId: input.streetId,
+    action: 'STREET_GEOMETRY_APPROVED',
+    newData: {
+      streetId: input.streetId,
+      officialName: updated?.officialName,
+      source: input.source ?? 'OpenStreetMap',
+      sourceName,
+      score,
+    },
+    userId,
+  })
+  return updated
+}
+
+export async function rejectOsmGeometry(
+  db: Database,
+  input: { importRecordId: string; reason?: string },
+  userId: string,
+) {
+  const [updated] = await db
+    .update(osmImportRecords)
+    .set({
+      status: 'REJECTED',
+      reviewedBy: userId,
+      reviewedAt: new Date(),
+    })
+    .where(eq(osmImportRecords.id, input.importRecordId))
+    .returning()
+
+  await audit(db, {
+    entityType: 'osm_import_record',
+    entityId: input.importRecordId,
+    action: 'STREET_GEOMETRY_REJECTED',
+    newData: { reason: input.reason },
+    userId,
+  })
+  return updated
+}
+
+export async function mergeStreetWithOsm(
+  db: Database,
+  input: { importRecordId: string; targetStreetId: string },
+  userId: string,
+) {
+  await db
+    .update(osmImportRecords)
+    .set({
+      multivusStreetId: input.targetStreetId,
+      status: 'MERGED',
+    })
+    .where(eq(osmImportRecords.id, input.importRecordId))
+
+  return approveOsmGeometry(
+    db,
+    { streetId: input.targetStreetId, importRecordId: input.importRecordId },
+    userId,
+  )
+}
+
+export async function createStreetFromOsm(
+  db: Database,
+  input: { importRecordId: string; officialName: string; streetType: string; neighborhoodId?: string | null },
+  userId: string,
+) {
+  const [record] = await db
+    .select()
+    .from(osmImportRecords)
+    .where(eq(osmImportRecords.id, input.importRecordId))
+    .limit(1)
+
+  if (!record) throw new Error('Registro de importação OSM não encontrado.')
+
+  const geomRes = await db.execute<{ geometry: unknown }>(sql`
+    SELECT ST_AsGeoJSON(geometry)::json AS geometry FROM osm_import_records WHERE id = ${record.id}
+  `)
+  const geom = rowsOf(geomRes)[0]?.geometry
+  if (!geom) throw new Error('Geometria OSM ausente.')
+
+  const street = await createStreet(
+    db,
+    {
+      officialName: input.officialName,
+      streetType: input.streetType as CreateStreetInput['streetType'],
+      neighborhoodId: input.neighborhoodId ?? null,
+      source: 'OpenStreetMap',
+      sourceDate: new Date().toISOString().slice(0, 10),
+      geometry: geom as CreateStreetInput['geometry'],
+    },
+    userId,
+  )
+
+  if (!street) throw new Error('Falha ao criar rua a partir do OSM.')
+  await approveOsmGeometry(db, { streetId: street.id, importRecordId: record.id, geometry: geom }, userId)
+  return street
+}
+
+export async function markOsmConflict(
+  db: Database,
+  input: { importRecordId: string; notes?: string },
+  userId: string,
+) {
+  const [updated] = await db
+    .update(osmImportRecords)
+    .set({
+      status: 'CONFLICT',
+      reviewedBy: userId,
+      reviewedAt: new Date(),
+    })
+    .where(eq(osmImportRecords.id, input.importRecordId))
+    .returning()
+  return updated
+}
+
+export async function confirmStreetNeighborhood(
+  db: Database,
+  input: { streetId: string; neighborhoodId: string; source?: string },
+  userId: string,
+) {
+  await db.execute(sql`
+    UPDATE streets SET
+      neighborhood_id = ${input.neighborhoodId},
+      neighborhood_status = 'CONFIRMED',
+      neighborhood_source = ${input.source ?? 'Conferência local'}
+    WHERE id = ${input.streetId}
+  `)
+
+  await audit(db, {
+    entityType: 'street',
+    entityId: input.streetId,
+    action: 'STREET_NEIGHBORHOOD_CONFIRMED',
+    newData: input,
+    userId,
+  })
+  return getStreet(db, input.streetId)
+}
+
+export async function listAddressPoints(db: Database, streetId: string) {
+  const result = await db.execute(sql`
+    SELECT
+      id,
+      street_id AS "streetId",
+      number,
+      ST_AsGeoJSON(geometry)::json AS geometry,
+      source,
+      source_date AS "sourceDate",
+      verified,
+      confidence_score AS "confidenceScore"
+    FROM address_points
+    WHERE street_id = ${streetId}
+    ORDER BY number
+  `)
+  return rowsOf(result)
+}
+
+export async function createAddressPoint(
+  db: Database,
+  input: CreateAddressPointInput,
+  userId: string,
+) {
+  const result = await db.execute<{ id: string }>(sql`
+    INSERT INTO address_points (
+      street_id, number, geometry, source, source_date, verified, confidence_score
+    ) VALUES (
+      ${input.streetId}, ${input.number},
+      ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), 4326),
+      ${input.source ?? 'Conferência local'},
+      to_char(now(), 'YYYY-MM-DD'),
+      true, 100
+    )
+    ON CONFLICT (street_id, number) DO UPDATE SET
+      geometry = EXCLUDED.geometry,
+      source = EXCLUDED.source,
+      verified = true,
+      confidence_score = 100
+    RETURNING id
+  `)
+  const id = rowsOf(result)[0]?.id
+  await audit(db, {
+    entityType: 'address_point',
+    entityId: id ?? input.streetId,
+    action: 'create',
+    newData: input,
+    userId,
+  })
   return { id }
 }
 
@@ -651,8 +1380,12 @@ export async function adminStats(db: Database) {
     streets: number
     verifiedStreets: number
     streetsWithoutGeometry: number
+    streetsWithoutNeighborhood: number
+    streetsWithOldNames: number
     neighborhoods: number
     places: number
+    landmarks: number
+    localReferences: number
     aliases: number
     users: number
   }>(sql`
@@ -661,13 +1394,48 @@ export async function adminStats(db: Database) {
       (SELECT count(*) FROM streets WHERE active)::int AS streets,
       (SELECT count(*) FROM streets WHERE active AND verified)::int AS "verifiedStreets",
       (SELECT count(*) FROM streets WHERE active AND geometry IS NULL)::int AS "streetsWithoutGeometry",
+      (SELECT count(*) FROM streets WHERE active AND (neighborhood_id IS NULL OR neighborhood_status = 'PENDING'))::int AS "streetsWithoutNeighborhood",
+      (SELECT count(DISTINCT street_id) FROM street_aliases WHERE alias_type = 'OLD_NAME')::int AS "streetsWithOldNames",
       (SELECT count(*) FROM neighborhoods WHERE active)::int AS neighborhoods,
       (SELECT count(*) FROM places WHERE active)::int AS places,
+      (SELECT count(*) FROM landmarks WHERE active)::int AS landmarks,
+      (SELECT count(*) FROM local_references WHERE active)::int AS "localReferences",
       (SELECT count(*) FROM street_aliases)::int AS aliases,
       (SELECT count(*) FROM users WHERE active)::int AS users
   `)
-  return rowsOf(result)[0]
+
+  const topSearches = await db.execute<{ query: string; count: number }>(sql`
+    SELECT query, count(*)::int AS count
+    FROM search_analytics
+    GROUP BY query
+    ORDER BY count DESC
+    LIMIT 6
+  `)
+
+  const topReferences = await db.execute<{ popularPhrase: string; targetStreetName: string | null; confirmationsCount: number }>(sql`
+    SELECT lr.popular_phrase AS "popularPhrase", s.official_name AS "targetStreetName", lr.confirmations_count AS "confirmationsCount"
+    FROM local_references lr
+    LEFT JOIN streets s ON s.id = lr.target_street_id
+    WHERE lr.active = true
+    ORDER BY lr.confirmations_count DESC
+    LIMIT 6
+  `)
+
+  const correctionsByType = await db.execute<{ correctionType: string; count: number }>(sql`
+    SELECT correction_type AS "correctionType", count(*)::int AS count
+    FROM map_corrections
+    GROUP BY correction_type
+    ORDER BY count DESC
+  `)
+
+  return {
+    ...rowsOf(result)[0],
+    topSearches: rowsOf(topSearches),
+    topReferences: rowsOf(topReferences),
+    correctionsByType: rowsOf(correctionsByType),
+  }
 }
+
 
 export async function listAudit(db: Database) {
   return db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100)

@@ -68,9 +68,41 @@ export type KvRow = {
   value: unknown
 }
 
+export type LocalLandmark = {
+  id: string
+  name: string
+  category: string
+  aliases: string[]
+  streetId: string | null
+  streetNumber: string | null
+  neighborhoodName: string | null
+  address: string | null
+  description: string | null
+  latitude: number | null
+  longitude: number | null
+  verified: boolean
+  confidence: number
+}
+
+export type LocalReference = {
+  id: string
+  popularPhrase: string
+  relationType: string
+  targetStreetId: string | null
+  targetStreetName: string | null
+  landmarkId: string | null
+  landmarkName: string | null
+  description: string | null
+  confirmationsCount: number
+  confidence: number
+  verified: boolean
+}
+
 export class MultivusDB extends Dexie {
   streets!: Table<LocalStreet, string>
   places!: Table<LocalPlace, string>
+  landmarks!: Table<LocalLandmark, string>
+  localReferences!: Table<LocalReference, string>
   neighborhoods!: Table<LocalNeighborhood, string>
   favorites!: Table<LocalFavorite, string>
   recents!: Table<LocalRecent, string>
@@ -88,9 +120,21 @@ export class MultivusDB extends Dexie {
       syncQueue: '++id, clientId, operation, createdAt',
       kv: 'key',
     })
+    this.version(2).stores({
+      streets: 'id, officialName, verified',
+      places: 'id, name, category',
+      landmarks: 'id, name, category, streetId',
+      localReferences: 'id, popularPhrase, targetStreetId, landmarkId',
+      neighborhoods: 'id, name',
+      favorites: 'id, createdAt',
+      recents: 'id, createdAt',
+      syncQueue: '++id, clientId, operation, createdAt',
+      kv: 'key',
+    })
   }
 }
 
 export function createDatabase(name?: string): MultivusDB {
   return new MultivusDB(name)
 }
+

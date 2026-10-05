@@ -1,0 +1,116 @@
+{
+  "source": "Linguagem Popular de Entregadores de Santa Juliana",
+  "sourceDate": "2026-10",
+  "references": [
+    {
+      "popularPhrase": "Rua do Hospital",
+      "relationType": "ON_STREET",
+      "targetStreetName": "Rua São Vicente de Paula",
+      "landmarkName": "Hospital Municipal de Santa Juliana",
+      "description": "Trecho da Rua São Vicente de Paula onde fica o Hospital Municipal",
+      "confirmationsCount": 10,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Rua da Bioklin",
+      "relationType": "ON_STREET",
+      "targetStreetName": "Rua São Vicente de Paula",
+      "landmarkName": "Laboratório Bioklin",
+      "description": "Trecho da Rua São Vicente de Paula em frente ao laboratório Bioklin",
+      "confirmationsCount": 8,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Rua do Cemitério",
+      "relationType": "ON_STREET",
+      "targetStreetName": "Rua São Vicente de Paula",
+      "landmarkName": "Cemitério Municipal Campo da Paz",
+      "description": "Via que dá acesso direto ao Cemitério Municipal",
+      "confirmationsCount": 9,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Atrás da Rodoviária",
+      "relationType": "BEHIND",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Terminal Rodoviário de Santa Juliana",
+      "description": "Entorno posterior ao terminal rodoviário",
+      "confirmationsCount": 7,
+      "confidenceScore": 95,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto da Lotérica",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua Antônio Rezende",
+      "landmarkName": "Lotérica Trevo da Sorte",
+      "description": "Região central próxima à casa lotérica",
+      "confirmationsCount": 6,
+      "confidenceScore": 90,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Ao lado da Prefeitura",
+      "relationType": "NEXT_TO",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Prefeitura Municipal de Santa Juliana",
+      "description": "Vizinhança imediata ao prédio da Prefeitura",
+      "confirmationsCount": 8,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto do Banco do Brasil",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua Antônio Rezende",
+      "landmarkName": "Banco do Brasil",
+      "description": "Quadra do Banco do Brasil no centro",
+      "confirmationsCount": 9,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto do Sicoob",
+      "relationType": "NEAR",
+      "targetStreetName": "Avenida Ennio Gonçalves",
+      "landmarkName": "Sicoob Crediara",
+      "description": "Avenida Ênio Gonçalves próximo ao Sicoob",
+      "confirmationsCount": 7,
+      "confidenceScore": 95,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto da Constrói",
+      "relationType": "NEAR",
+      "targetStreetName": "Avenida Ennio Gonçalves",
+      "landmarkName": "Constrói Santa Juliana",
+      "description": "Região da Avenida Ênio Gonçalves próxima à Constrói",
+      "confirmationsCount": 7,
+      "confidenceScore": 95,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Rua do Kevin Gás",
+      "relationType": "ON_STREET",
+      "targetStreetName": "Rua Jovelino Cândido da Mota",
+      "landmarkName": "Kevin Gás",
+      "description": "Rua no bairro Primavera onde se localiza o depósito Kevin Gás",
+      "confirmationsCount": 10,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto da Igreja Matriz",
+      "relationType": "NEAR",
+      "targetStreetName": "Praça Umbelina Rodrigues Ferreira",
+      "landmarkName": "Igreja Matriz Santa Juliana de Falconieri",
+      "description": "Entorno da praça central da matriz",
+      "confirmationsCount": 12,
+      "confidenceScore": 100,
+      "verified": true
+    }
+  ]
+}

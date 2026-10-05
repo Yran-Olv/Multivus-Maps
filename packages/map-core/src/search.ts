@@ -9,7 +9,7 @@ export type SearchableAlias = {
 
 export type SearchableRecord = {
   id: string
-  kind: 'street' | 'place' | 'neighborhood'
+  kind: 'street' | 'place' | 'landmark' | 'reference' | 'neighborhood'
   title: string
   streetType?: string | null
   neighborhoodName?: string | null
@@ -22,6 +22,12 @@ export type SearchableRecord = {
   aliases?: SearchableAlias[]
   extraText?: string | null
   confidence?: number | null
+  category?: string | null
+  targetStreetId?: string | null
+  targetStreetName?: string | null
+  landmarkId?: string | null
+  landmarkName?: string | null
+  relationType?: string | null
 }
 
 export type RankedHit = SearchableRecord & {
@@ -34,6 +40,7 @@ export type RankedHit = SearchableRecord & {
   oldNames: string[]
   confidence: number
 }
+
 
 function trigrams(value: string): Set<string> {
   const padded = `  ${value}  `
@@ -126,6 +133,38 @@ export function searchRecords(
     const score = Math.max(nameScore, aliasScore)
     if (score < 40) continue
     const aliasWins = aliasScore >= nameScore && aliasScore > 0
+
+    if (record.kind === 'landmark') {
+      const catLabel = record.category ? record.category.charAt(0).toUpperCase() + record.category.slice(1) : 'Ponto de referência'
+      hits.push({
+        ...record,
+        score,
+        matchedAlias: aliasWins ? matchedAlias : null,
+        matchedAliasType: aliasWins ? matchedAliasType : null,
+        subtitle: record.neighborhoodName ? `📍 ${catLabel} · Bairro ${record.neighborhoodName}` : `📍 ${catLabel}`,
+        warning: null,
+        usedOldName: false,
+        oldNames: [],
+        confidence: record.confidence ?? (record.verified ? 100 : 70),
+      })
+      continue
+    }
+
+    if (record.kind === 'reference') {
+      hits.push({
+        ...record,
+        score: Math.max(score, 75), // referências coloquiais exatas devem ter alta relevância
+        matchedAlias: aliasWins ? matchedAlias : null,
+        matchedAliasType: aliasWins ? matchedAliasType : null,
+        subtitle: record.targetStreetName ? `🔗 Referência popular → ${record.targetStreetName}` : '🔗 Referência de entrega',
+        warning: `Expressão popular utilizada por entregadores e moradores de Santa Juliana.`,
+        usedOldName: false,
+        oldNames: [],
+        confidence: record.confidence ?? 80,
+      })
+      continue
+    }
+
     const described = describeStreet({
       title: record.title,
       streetType: record.streetType,
@@ -149,6 +188,7 @@ export function searchRecords(
       confidence: described.confidence,
     })
   }
+
 
   hits.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, 'pt-BR'))
   return hits.slice(0, limit)

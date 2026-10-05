@@ -31,6 +31,10 @@ export const CORRECTION_TYPES = [
   'STREET_BLOCKED',
   'WRONG_LOCATION',
   'WRONG_NEIGHBORHOOD',
+  'NEW_LANDMARK',
+  'NEW_POPULAR_NAME',
+  'POTHOLE',
+  'ROADWORK',
   'OTHER',
 ] as const
 export type CorrectionType = (typeof CORRECTION_TYPES)[number]
@@ -42,11 +46,60 @@ export const CORRECTION_TYPE_LABELS: Record<CorrectionType, string> = {
   WRONG_DIRECTION: 'Sentido incorreto',
   TURN_FORBIDDEN: 'Conversão proibida',
   TURN_ALLOWED: 'Conversão permitida',
-  STREET_BLOCKED: 'Rua bloqueada',
+  STREET_BLOCKED: 'Rua bloqueada / fechada',
   WRONG_LOCATION: 'Localização incorreta',
   WRONG_NEIGHBORHOOD: 'Bairro incorreto',
+  NEW_LANDMARK: 'Novo ponto de referência',
+  NEW_POPULAR_NAME: 'Novo nome popular / referência',
+  POTHOLE: 'Buraco perigoso na via',
+  ROADWORK: 'Obra na via',
   OTHER: 'Outro',
 }
+
+export const LANDMARK_CATEGORIES = [
+  'hospital',
+  'praca',
+  'escola',
+  'igreja',
+  'posto',
+  'comercio',
+  'orgao_publico',
+  'outro',
+] as const
+export type LandmarkCategory = (typeof LANDMARK_CATEGORIES)[number]
+
+export const LANDMARK_CATEGORY_LABELS: Record<LandmarkCategory, string> = {
+  hospital: 'Hospital / Saúde',
+  praca: 'Praça',
+  escola: 'Escola / Educação',
+  igreja: 'Igreja / Templo',
+  posto: 'Posto de Combustível',
+  comercio: 'Comércio / Serviço',
+  orgao_publico: 'Órgão Público',
+  outro: 'Outro',
+}
+
+export const RELATION_TYPES = [
+  'ON_STREET',
+  'NEAR',
+  'BEHIND',
+  'IN_FRONT_OF',
+  'NEXT_TO',
+  'CORNER',
+  'OTHER',
+] as const
+export type RelationType = (typeof RELATION_TYPES)[number]
+
+export const RELATION_TYPE_LABELS: Record<RelationType, string> = {
+  ON_STREET: 'Na rua de',
+  NEAR: 'Perto de',
+  BEHIND: 'Atrás de',
+  IN_FRONT_OF: 'Em frente a',
+  NEXT_TO: 'Ao lado de',
+  CORNER: 'Na esquina com',
+  OTHER: 'Outra relação',
+}
+
 
 export const ALIAS_TYPE_LABELS: Record<AliasType, string> = {
   OLD_NAME: 'Nome antigo',

@@ -192,6 +192,28 @@ importers:
         specifier: ^5.9.2
         version: 5.9.3
 
+  packages/map-import:
+    dependencies:
+      '@multivus/database':
+        specifier: workspace:*
+        version: link:../database
+      '@multivus/map-core':
+        specifier: workspace:*
+        version: link:../map-core
+      '@multivus/shared':
+        specifier: workspace:*
+        version: link:../shared
+      pg:
+        specifier: ^8.16.2
+        version: 8.23.1
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.23.1
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
   packages/offline:
     dependencies:
       dexie:

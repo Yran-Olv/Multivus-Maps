@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -164,6 +165,128 @@ export async function seed(connectionString: string): Promise<void> {
       )
     }
 
+    try {
+      const landmarkFile = await readJson<{
+        landmarks: Array<{
+          name: string
+          category: string
+          aliases: string[]
+          streetName?: string
+          streetNumber?: string
+          address?: string
+          description?: string
+          latitude?: number
+          longitude?: number
+          verified: boolean
+          confidenceScore: number
+        }>
+      }>('landmarks.seed.json')
+
+      for (const lm of landmarkFile.landmarks) {
+        let streetId: string | null = null
+        if (lm.streetName) {
+          const streetRes = await client.query<{ id: string }>(
+            `SELECT id FROM streets WHERE city_id = $1 AND normalized_name = $2 LIMIT 1`,
+            [cityId, normalizeAddress(lm.streetName)],
+          )
+          streetId = streetRes.rows[0]?.id ?? null
+        }
+
+        const pointGeo = lm.latitude && lm.longitude
+          ? `ST_SetSRID(ST_MakePoint(${lm.longitude}, ${lm.latitude}), 4326)`
+          : 'NULL'
+
+        await client.query(
+          `INSERT INTO landmarks (
+             city_id, name, normalized_name, category, aliases, street_id, street_number,
+             address, description, latitude, longitude, geometry, verified, confidence_score
+           )
+           SELECT $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, ${pointGeo}, $12, $13
+           WHERE NOT EXISTS (
+             SELECT 1 FROM landmarks WHERE city_id = $1 AND normalized_name = $3
+           )`,
+          [
+            cityId,
+            lm.name,
+            normalizeAddress(lm.name),
+            lm.category,
+            JSON.stringify(lm.aliases ?? []),
+            streetId,
+            lm.streetNumber ?? null,
+            lm.address ?? null,
+            lm.description ?? null,
+            lm.latitude ?? null,
+            lm.longitude ?? null,
+            lm.verified ?? false,
+            lm.confidenceScore ?? 70,
+          ],
+        )
+      }
+    } catch (e) {
+      console.warn('Aviso: landmarks.seed.json não encontrado ou erro:', e)
+    }
+
+    try {
+      const refFile = await readJson<{
+        references: Array<{
+          popularPhrase: string
+          relationType: string
+          targetStreetName?: string
+          landmarkName?: string
+          description?: string
+          confirmationsCount: number
+          confidenceScore: number
+          verified: boolean
+        }>
+      }>('local-references.seed.json')
+
+      for (const ref of refFile.references) {
+        let targetStreetId: string | null = null
+        if (ref.targetStreetName) {
+          const streetRes = await client.query<{ id: string }>(
+            `SELECT id FROM streets WHERE city_id = $1 AND normalized_name = $2 LIMIT 1`,
+            [cityId, normalizeAddress(ref.targetStreetName)],
+          )
+          targetStreetId = streetRes.rows[0]?.id ?? null
+        }
+
+        let landmarkId: string | null = null
+        if (ref.landmarkName) {
+          const lmRes = await client.query<{ id: string }>(
+            `SELECT id FROM landmarks WHERE city_id = $1 AND normalized_name = $2 LIMIT 1`,
+            [cityId, normalizeAddress(ref.landmarkName)],
+          )
+          landmarkId = lmRes.rows[0]?.id ?? null
+        }
+
+        await client.query(
+          `INSERT INTO local_references (
+             city_id, popular_phrase, normalized_phrase, relation_type,
+             target_street_id, landmark_id, description, confirmations_count, confidence_score, verified
+           )
+           SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+           WHERE NOT EXISTS (
+             SELECT 1 FROM local_references WHERE city_id = $1 AND normalized_phrase = $3
+           )`,
+          [
+            cityId,
+            ref.popularPhrase,
+            normalizeAddress(ref.popularPhrase),
+            ref.relationType,
+            targetStreetId,
+            landmarkId,
+            ref.description ?? null,
+            ref.confirmationsCount ?? 1,
+            ref.confidenceScore ?? 70,
+            ref.verified ?? false,
+          ],
+        )
+      }
+    } catch (e) {
+      console.warn('Aviso: local-references.seed.json não encontrado ou erro:', e)
+    }
+
+
     const adminEmail = process.env.ADMIN_EMAIL
     const adminPassword = process.env.ADMIN_PASSWORD
     if (adminEmail && adminPassword) {
@@ -190,7 +313,30 @@ const ranDirectly = process.argv[1]
   && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
   && fileURLToPath(import.meta.url).endsWith('seed.ts')
 
+function loadEnv(): void {
+  if (process.env.DATABASE_URL) return
+  const candidates = [resolve(process.cwd(), '.env'), resolve(dirname(fileURLToPath(import.meta.url)), '../../../.env')]
+  for (const file of candidates) {
+    try {
+      const content = readFileSync(file, 'utf8')
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith('#')) continue
+        const eq = trimmed.indexOf('=')
+        if (eq === -1) continue
+        const key = trimmed.slice(0, eq).trim()
+        const value = trimmed.slice(eq + 1).trim()
+        if (process.env[key] === undefined) process.env[key] = value
+      }
+      return
+    } catch {
+      // ignore
+    }
+  }
+}
+
 if (ranDirectly) {
+  loadEnv()
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) {
     console.error('DATABASE_URL ausente. Copie .env.example para .env.')
