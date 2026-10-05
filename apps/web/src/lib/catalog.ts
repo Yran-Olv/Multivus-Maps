@@ -259,10 +259,21 @@ export function pointOf(geometry: unknown): { latitude: number; longitude: numbe
     const [longitude, latitude] = value.coordinates as number[]
     if (typeof longitude === 'number' && typeof latitude === 'number') return { longitude, latitude }
   }
-  if (value.type === 'LineString' && Array.isArray(value.coordinates)) {
-    const first = value.coordinates[0] as number[] | undefined
-    if (first && typeof first[0] === 'number' && typeof first[1] === 'number') {
-      return { longitude: first[0], latitude: first[1] }
+  if (value.type === 'LineString' && Array.isArray(value.coordinates) && value.coordinates.length > 0) {
+    const coords = value.coordinates as number[][]
+    const mid = coords[Math.floor(coords.length / 2)] || coords[0]
+    if (mid && typeof mid[0] === 'number' && typeof mid[1] === 'number') {
+      return { longitude: mid[0], latitude: mid[1] }
+    }
+  }
+  if (value.type === 'MultiLineString' && Array.isArray(value.coordinates) && value.coordinates.length > 0) {
+    const lines = value.coordinates as number[][][]
+    const longest = [...lines].sort((a, b) => b.length - a.length)[0]
+    if (longest && longest.length > 0) {
+      const mid = longest[Math.floor(longest.length / 2)] || longest[0]
+      if (mid && typeof mid[0] === 'number' && typeof mid[1] === 'number') {
+        return { longitude: mid[0], latitude: mid[1] }
+      }
     }
   }
   return null
@@ -270,7 +281,31 @@ export function pointOf(geometry: unknown): { latitude: number; longitude: numbe
 
 export function lineOf(id: string, geometry: unknown): { id: string; coordinates: [number, number][] } | null {
   if (!geometry || typeof geometry !== 'object') return null
-  const value = geometry as { type?: string; coordinates?: [number, number][] }
-  if (value.type !== 'LineString' || !Array.isArray(value.coordinates) || value.coordinates.length < 2) return null
-  return { id, coordinates: value.coordinates }
+  const value = geometry as { type?: string; coordinates?: unknown }
+  if (value.type === 'LineString' && Array.isArray(value.coordinates) && value.coordinates.length >= 2) {
+    return { id, coordinates: value.coordinates as [number, number][] }
+  }
+  if (value.type === 'MultiLineString' && Array.isArray(value.coordinates) && value.coordinates.length > 0) {
+    const lines = value.coordinates as [number, number][][]
+    const sorted = [...lines].sort((a, b) => b.length - a.length)
+    if (sorted[0] && sorted[0].length >= 2) {
+      return { id, coordinates: sorted[0] }
+    }
+  }
+  return null
+}
+
+export function linesOf(id: string, geometry: unknown): Array<{ id: string; coordinates: [number, number][] }> {
+  if (!geometry || typeof geometry !== 'object') return []
+  const value = geometry as { type?: string; coordinates?: unknown }
+  if (value.type === 'LineString' && Array.isArray(value.coordinates) && value.coordinates.length >= 2) {
+    return [{ id, coordinates: value.coordinates as [number, number][] }]
+  }
+  if (value.type === 'MultiLineString' && Array.isArray(value.coordinates)) {
+    const lines = value.coordinates as [number, number][][]
+    return lines
+      .filter((line) => line.length >= 2)
+      .map((line, idx) => ({ id: `${id}-${idx}`, coordinates: line }))
+  }
+  return []
 }

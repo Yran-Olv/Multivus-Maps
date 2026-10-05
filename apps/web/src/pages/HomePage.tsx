@@ -12,7 +12,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { usePlatform } from '../platform/context'
-import { lineOf } from '../lib/catalog'
+import { linesOf } from '../lib/catalog'
 import { db } from '../lib/db'
 import { useSession } from '../lib/session'
 import { flushPending, isUuid } from '../lib/sync'
@@ -58,8 +58,7 @@ export function HomePage() {
   const lines = useMemo(
     () =>
       (catalog.data?.streets ?? [])
-        .map((street) => lineOf(street.id, street.geometry))
-        .filter((line): line is NonNullable<typeof line> => line !== null),
+        .flatMap((street) => linesOf(street.id, street.geometry)),
     [catalog.data?.streets],
   )
   const points = pin
