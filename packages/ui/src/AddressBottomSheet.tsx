@@ -25,6 +25,7 @@ type AddressBottomSheetProps = {
   goMessage?: string | null
   activeRouteSummary?: { distanceKm: number; durationMin: number; nextInstruction?: string } | null
   onClearRoute?: () => void
+  routeFailed?: boolean
 }
 
 export function AddressBottomSheet(props: AddressBottomSheetProps) {
@@ -83,15 +84,57 @@ export function AddressBottomSheet(props: AddressBottomSheetProps) {
         </div>
       ) : null}
 
-      {/* Se tem geometria: Botão IR principal */}
-      {hasGeom ? (
+      {/* Se falhar o cálculo da rota: Opção manual clara sem redirecionamento automático */}
+      {props.routeFailed ? (
+        <div className="mt-4 rounded-2xl bg-rose-50 border border-rose-200 p-4 text-rose-950">
+          <p className="text-sm font-bold flex items-center gap-1.5 text-rose-900">
+            <span>⚠️</span> Não foi possível calcular a rota no Multivus Maps.
+          </p>
+          <p className="mt-1 text-xs text-rose-800">
+            Você pode tentar calcular novamente ou abrir manualmente no seu aplicativo preferido:
+          </p>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={props.onGo}
+              className="h-11 w-full rounded-xl bg-rose-600 text-xs font-bold text-white shadow hover:bg-rose-700 active:scale-[0.99] transition"
+            >
+              TENTAR NOVAMENTE
+            </button>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => props.onOpenExternal?.('google')}
+              className="h-10 rounded-xl bg-white border border-rose-300 text-xs font-semibold text-slate-800 shadow-sm hover:bg-rose-100/50"
+            >
+              Google Maps
+            </button>
+            <button
+              type="button"
+              onClick={() => props.onOpenExternal?.('waze')}
+              className="h-10 rounded-xl bg-white border border-rose-300 text-xs font-semibold text-slate-800 shadow-sm hover:bg-rose-100/50"
+            >
+              Waze
+            </button>
+            <button
+              type="button"
+              onClick={() => props.onOpenExternal?.('apple')}
+              className="h-10 rounded-xl bg-white border border-rose-300 text-xs font-semibold text-slate-800 shadow-sm hover:bg-rose-100/50"
+            >
+              Apple Maps
+            </button>
+          </div>
+        </div>
+      ) : hasGeom ? (
+        /* Se tem geometria: Botão IR principal */
         <div className="mt-4">
           <button
             type="button"
             onClick={props.onGo}
-            className="h-12 w-full rounded-xl bg-[#f0b429] text-sm font-semibold text-slate-900 shadow hover:brightness-105 active:scale-[0.99] transition"
+            className="h-12 w-full rounded-xl bg-[#f0b429] text-sm font-bold text-slate-900 shadow hover:brightness-105 active:scale-[0.99] transition"
           >
-            {props.activeRouteSummary ? 'RECALCULAR ROTA' : 'IR PARA O LOCAL'}
+            {props.activeRouteSummary ? 'INICIAR NAVEGAÇÃO' : 'IR PARA O LOCAL'}
           </button>
           <div className="mt-2 flex items-center justify-center gap-2 text-xs text-slate-500">
             <span>Ou abrir direto no:</span>

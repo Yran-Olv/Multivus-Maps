@@ -20,16 +20,10 @@ export class WebNavigationService implements NavigationService {
     }
 
     if (input.latitude !== null && input.longitude !== null) {
-      openDeviceMaps(
-        `https://www.google.com/maps/dir/?api=1&destination=${input.latitude},${input.longitude}`,
-      )
       return { status: 'centered', latitude: input.latitude, longitude: input.longitude }
     }
 
-    const query = [input.label, 'Santa Juliana', 'MG'].filter(Boolean).join(', ')
-    if (!query.trim()) return { status: 'missing_coordinates' }
-    openDeviceMaps(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`)
-    return { status: 'external', app: 'google' }
+    return { status: 'missing_coordinates' }
   }
 
   async openExternalMap(

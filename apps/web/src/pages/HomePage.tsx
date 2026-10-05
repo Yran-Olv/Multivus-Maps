@@ -1,11 +1,23 @@
-import { createRoutingProvider, formatShareText, type RouteCalculationResult } from '@multivus/map-core'
+import {
+  createNavigationSession,
+  createRoutingProvider,
+  formatNavigationDistance,
+  formatNavigationDuration,
+  formatShareText,
+  updateNavigationProgress,
+  type NavigationDestination,
+  type NavigationSession,
+  type RouteCalculationResult,
+} from '@multivus/map-core'
 import { enqueueOperation } from '@multivus/offline'
+import type { GeoPosition } from '@multivus/services'
 import type { CorrectionType } from '@multivus/shared'
 import {
   AddressBottomSheet,
   CurrentLocationButton,
   Map,
   MapCorrectionModal,
+  NavigationHud,
   SearchBar,
   type MapHandle,
 } from '@multivus/ui'
@@ -43,11 +55,26 @@ export function HomePage() {
   const [submitting, setSubmitting] = useState(false)
   const [goMessage, setGoMessage] = useState<string | null>(null)
   const [activeRoute, setActiveRoute] = useState<RouteCalculationResult | null>(null)
+  const [routeFailed, setRouteFailed] = useState(false)
+  const [navSession, setNavSession] = useState<NavigationSession | null>(null)
+  const [currentGps, setCurrentGps] = useState<GeoPosition | null>(null)
+
+  const watchUnsubRef = useRef<(() => void) | null>(null)
+  const isRecalculatingRef = useRef(false)
 
   useEffect(() => {
     setGoMessage(null)
     setActiveRoute(null)
+    setRouteFailed(false)
+    stopNavigation()
   }, [selected?.id])
+
+  useEffect(() => {
+    return () => {
+      watchUnsubRef.current?.()
+      platform.voice.stop()
+    }
+  }, [platform.voice])
 
   useEffect(() => {
     if (!notice) return
@@ -78,14 +105,132 @@ export function HomePage() {
     }
   }
 
+  function stopNavigation() {
+    if (watchUnsubRef.current) {
+      watchUnsubRef.current()
+      watchUnsubRef.current = null
+    }
+    platform.voice.stop()
+    setNavSession(null)
+  }
+
+  function toggleVoice() {
+    setNavSession((prev) => {
+      if (!prev) return null
+      const nextVoice = !prev.voiceEnabled
+      platform.voice.setEnabled(nextVoice)
+      return { ...prev, voiceEnabled: nextVoice }
+    })
+  }
+
+  async function triggerRecalculate(pos: { latitude: number; longitude: number }, destination: NavigationDestination) {
+    if (isRecalculatingRef.current || !online) return
+    isRecalculatingRef.current = true
+    try {
+      const routeResult = await routing.calculateRoute(
+        { latitude: pos.latitude, longitude: pos.longitude },
+        { latitude: destination.latitude, longitude: destination.longitude },
+      )
+      if (routeResult.status === 'ok' && routeResult.geometry) {
+        setActiveRoute(routeResult)
+        platform.voice.speak('Rota recalculada.')
+        setNavSession((curr) => {
+          if (!curr) return null
+          return {
+            ...curr,
+            activeRoute: routeResult,
+            currentStepIndex: 0,
+            remainingDistance: routeResult.distance,
+            remainingDuration: routeResult.duration,
+            currentInstruction: routeResult.steps[0]?.instruction || curr.currentInstruction,
+            nextInstruction: routeResult.steps[1]?.instruction,
+            distanceToNextManeuver: routeResult.steps[0]?.distance || routeResult.distance,
+            isOffRoute: false,
+            status: 'navigating',
+            statusMessage: 'Rota recalculada',
+          }
+        })
+      }
+    } catch (err) {
+      console.warn('Falha ao recalcular rota:', err)
+    } finally {
+      isRecalculatingRef.current = false
+    }
+  }
+
+  function handleGpsProgress(pos: GeoPosition) {
+    setCurrentGps(pos)
+    useUi.getState().setLocation(pos)
+    setNavSession((prev) => {
+      if (!prev || !prev.isNavigating) return prev
+
+      // Suavemente centraliza e acompanha o usuário durante a rota
+      mapRef.current?.flyTo(pos.longitude, pos.latitude, 17)
+
+      const result = updateNavigationProgress(prev, [pos.longitude, pos.latitude])
+
+      if (result.announcement) {
+        platform.voice.speak(result.announcement)
+      }
+
+      // Se saiu da rota (> 40m), dispara recálculo automático
+      if (result.session.isOffRoute && !isRecalculatingRef.current && online) {
+        void triggerRecalculate(pos, result.session.destination)
+      }
+
+      // Se chegou ao destino (< 30m)
+      if (result.session.isArrived) {
+        stopNavigation()
+        useUi.getState().setNotice('Você chegou ao destino!')
+      }
+
+      return result.session
+    })
+  }
+
+  async function startTurnByTurn(route: RouteCalculationResult, destination: NavigationDestination) {
+    const session = createNavigationSession(route, destination, { voiceEnabled: true })
+    setNavSession(session)
+    setGoMessage(null)
+    setRouteFailed(false)
+
+    if (session.currentInstruction) {
+      platform.voice.speak(`Iniciando navegação. ${session.currentInstruction}`)
+    }
+
+    if (watchUnsubRef.current) {
+      watchUnsubRef.current()
+      watchUnsubRef.current = null
+    }
+
+    try {
+      const unsub = await platform.location.watchPosition(
+        (pos) => {
+          useUi.getState().setLocation(pos)
+          handleGpsProgress(pos)
+        },
+        (err) => {
+          console.warn('Erro ao acompanhar GPS contínuo:', err)
+        },
+      )
+      watchUnsubRef.current = unsub
+    } catch (err) {
+      console.warn('Não foi possível iniciar GPS contínuo:', err)
+    }
+  }
+
   async function go() {
     if (!selected) return
     const place = [selected.title, number].filter(Boolean).join(', ')
 
     if (!selected.verified || selected.latitude === null || selected.longitude === null) {
-      setGoMessage('Esta via ainda não possui geometria verificada no Multivus Maps. Escolha um mapa externo abaixo.')
+      setRouteFailed(true)
+      setGoMessage('Esta via ainda não possui geometria verificada no Multivus Maps.')
       return
     }
+
+    setRouteFailed(false)
+    setGoMessage('Obtendo sua localização...')
 
     let userPos = location
     if (!userPos) {
@@ -98,7 +243,19 @@ export function HomePage() {
       }
     }
 
-    setGoMessage('Calculando rota OSRM...')
+    const destination: NavigationDestination = {
+      title: place,
+      latitude: selected.latitude,
+      longitude: selected.longitude,
+    }
+
+    // Se a rota já foi calculada e o usuário clicou para iniciar:
+    if (activeRoute && activeRoute.status === 'ok') {
+      await startTurnByTurn(activeRoute, destination)
+      return
+    }
+
+    setGoMessage('Calculando rota no Multivus Maps...')
     try {
       const routeResult = await routing.calculateRoute(
         { latitude: userPos.latitude, longitude: userPos.longitude },
@@ -108,25 +265,21 @@ export function HomePage() {
       if (routeResult.status === 'ok' && routeResult.geometry) {
         setActiveRoute(routeResult)
         mapRef.current?.fitBounds(routeResult.geometry.coordinates)
-        setGoMessage(`Rota calculada: ${(routeResult.distance / 1000).toFixed(1)} km (~${Math.max(1, Math.round(routeResult.duration / 60))} min)`)
+        setGoMessage(
+          `Rota calculada: ${(routeResult.distance / 1000).toFixed(1)} km (~${Math.max(1, Math.round(routeResult.duration / 60))} min).`,
+        )
+        // Inicia automaticamente o modo de navegação guiada no Multivus Maps
+        await startTurnByTurn(routeResult, destination)
         return
       }
+
+      setRouteFailed(true)
+      setGoMessage(routeResult.message || 'Não foi possível calcular a rota no Multivus Maps.')
     } catch (error) {
       console.warn('Erro ao calcular rota OSRM:', error)
+      setRouteFailed(true)
+      setGoMessage('Não foi possível calcular a rota no Multivus Maps.')
     }
-
-    // Se falhar o cálculo OSRM, abre navegação nativa externa
-    const result = await platform.navigation.startNavigation({
-      label: place,
-      latitude: selected.latitude,
-      longitude: selected.longitude,
-    })
-    if (result.status === 'centered') {
-      mapRef.current?.flyTo(result.longitude, result.latitude)
-      setGoMessage('Ponto centralizado. A rota também abriu no mapa do celular.')
-      return
-    }
-    setGoMessage('Rota externa iniciada no aplicativo do dispositivo.')
   }
 
   async function openExternal(app?: 'google' | 'waze' | 'apple') {
@@ -243,56 +396,95 @@ export function HomePage() {
         userLocation={location}
         onClick={correctionOpen ? (point) => setPin(point) : undefined}
       />
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3">
-        <div className="pointer-events-auto">
-          <SearchBar onFocus={() => navigate('/busca')} />
-        </div>
-        {notice ? (
-          <p className="pointer-events-none mt-2 rounded-2xl bg-white/95 px-4 py-3 text-sm text-slate-800 shadow">{notice}</p>
-        ) : null}
-      </div>
-      <div className="absolute right-4 bottom-4 z-20">
-        <CurrentLocationButton onClick={() => void centerOnMe()} busy={busy} />
-      </div>
-      {selected && !correctionOpen ? (
-        <AddressBottomSheet
-          title={selected.title}
-          neighborhood={selected.neighborhoodName}
-          oldNames={selected.oldNames}
-          warning={selected.warning}
-          customerInput={selected.usedOldName ? selected.customerInput : null}
-          reference={selected.reference}
-          confidence={selected.confidence}
-          source={selected.source}
-          sourceDate={selected.sourceDate}
-          verified={selected.verified}
-          hasGeometry={Boolean(selected.verified && selected.latitude !== null && selected.longitude !== null)}
-          streetNumber={number}
-          onStreetNumber={(value) => useUi.getState().setNumber(value)}
-          onClose={() => {
-            useUi.getState().setSelected(null)
-            setActiveRoute(null)
+
+      {/* 1. MODO NAVEGAÇÃO ATIVA: NavigationHud Guiado em Tempo Real */}
+      {navSession && navSession.isNavigating ? (
+        <NavigationHud
+          instruction={navSession.currentInstruction}
+          nextInstruction={navSession.nextInstruction}
+          distanceToManeuver={formatNavigationDistance(navSession.distanceToNextManeuver)}
+          remainingDistance={formatNavigationDistance(navSession.remainingDistance)}
+          remainingDuration={formatNavigationDuration(navSession.remainingDuration)}
+          destinationTitle={navSession.destination.title}
+          maneuverType={navSession.activeRoute.steps?.[navSession.currentStepIndex]?.maneuverType}
+          maneuverModifier={navSession.activeRoute.steps?.[navSession.currentStepIndex]?.maneuverModifier}
+          speedKmh={currentGps?.speed !== null && currentGps?.speed !== undefined ? currentGps.speed * 3.6 : null}
+          offline={!online}
+          isRecalculating={navSession.status === 'recalculating' || navSession.isOffRoute}
+          isArrived={navSession.isArrived}
+          voiceEnabled={navSession.voiceEnabled}
+          onToggleVoice={toggleVoice}
+          onRecalculate={() => {
+            const pt = currentGps || location
+            if (pt && navSession) {
+              void triggerRecalculate(pt, navSession.destination)
+            }
           }}
-          onGo={() => void go()}
-          onOpenExternal={(app) => void openExternal(app)}
-          onSave={() => void save()}
-          onShare={() => void share()}
-          onAddReference={() => navigate(`/entregas?referencia=${encodeURIComponent(selected.title)}`)}
-          onAddPhoto={() => navigate(`/entregas?foto=1&referencia=${encodeURIComponent(selected.title)}`)}
-          onReport={openCorrection}
-          goMessage={goMessage}
-          activeRouteSummary={
-            activeRoute?.status === 'ok'
-              ? {
-                  distanceKm: activeRoute.distance / 1000,
-                  durationMin: Math.max(1, Math.round(activeRoute.duration / 60)),
-                  nextInstruction: activeRoute.steps[0]?.instruction,
-                }
-              : null
-          }
-          onClearRoute={() => setActiveRoute(null)}
+          onEndNavigation={stopNavigation}
         />
-      ) : null}
+      ) : (
+        /* 2. MODO PADRÃO: Barra de busca e painel de endereço */
+        <>
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3">
+            <div className="pointer-events-auto">
+              <SearchBar onFocus={() => navigate('/busca')} />
+            </div>
+            {notice ? (
+              <p className="pointer-events-none mt-2 rounded-2xl bg-white/95 px-4 py-3 text-sm text-slate-800 shadow">{notice}</p>
+            ) : null}
+          </div>
+          <div className="absolute right-4 bottom-4 z-20">
+            <CurrentLocationButton onClick={() => void centerOnMe()} busy={busy} />
+          </div>
+          {selected && !correctionOpen ? (
+            <AddressBottomSheet
+              title={selected.title}
+              neighborhood={selected.neighborhoodName}
+              oldNames={selected.oldNames}
+              warning={selected.warning}
+              customerInput={selected.usedOldName ? selected.customerInput : null}
+              reference={selected.reference}
+              confidence={selected.confidence}
+              source={selected.source}
+              sourceDate={selected.sourceDate}
+              verified={selected.verified}
+              hasGeometry={Boolean(selected.verified && selected.latitude !== null && selected.longitude !== null)}
+              streetNumber={number}
+              onStreetNumber={(value) => useUi.getState().setNumber(value)}
+              onClose={() => {
+                useUi.getState().setSelected(null)
+                setActiveRoute(null)
+                setRouteFailed(false)
+                stopNavigation()
+              }}
+              onGo={() => void go()}
+              onOpenExternal={(app) => void openExternal(app)}
+              onSave={() => void save()}
+              onShare={() => void share()}
+              onAddReference={() => navigate(`/entregas?referencia=${encodeURIComponent(selected.title)}`)}
+              onAddPhoto={() => navigate(`/entregas?foto=1&referencia=${encodeURIComponent(selected.title)}`)}
+              onReport={openCorrection}
+              goMessage={goMessage}
+              routeFailed={routeFailed}
+              activeRouteSummary={
+                activeRoute?.status === 'ok'
+                  ? {
+                      distanceKm: activeRoute.distance / 1000,
+                      durationMin: Math.max(1, Math.round(activeRoute.duration / 60)),
+                      nextInstruction: activeRoute.steps[0]?.instruction,
+                    }
+                  : null
+              }
+              onClearRoute={() => {
+                setActiveRoute(null)
+                setRouteFailed(false)
+                setGoMessage(null)
+                stopNavigation()
+              }}
+            />
+          ) : null}
+        </>
+      )}
       <MapCorrectionModal
         open={correctionOpen}
         description={description}

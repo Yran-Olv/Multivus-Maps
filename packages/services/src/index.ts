@@ -64,6 +64,13 @@ export interface NavigationService {
   ): Promise<boolean>
 }
 
+export interface VoiceService {
+  speak(text: string, force?: boolean): void
+  stop(): void
+  setEnabled(enabled: boolean): void
+  isEnabled(): boolean
+}
+
 type CapacitorGlobal = {
   isNativePlatform?: () => boolean
 }

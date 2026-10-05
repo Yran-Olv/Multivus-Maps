@@ -9,6 +9,8 @@ export type RouteStep = {
   duration: number
   name?: string
   maneuverType?: string
+  maneuverModifier?: string
+  location?: [number, number] // [longitude, latitude]
 }
 
 export type RouteCalculationResult = {
@@ -74,7 +76,7 @@ export class OSRMProvider implements RoutingProvider {
               distance: number
               duration: number
               name: string
-              maneuver?: { type: string; modifier?: string }
+              maneuver?: { type: string; modifier?: string; location?: [number, number] }
             }>
           }>
         }>
@@ -101,6 +103,8 @@ export class OSRMProvider implements RoutingProvider {
         duration: Math.round(step.duration),
         name: step.name || undefined,
         maneuverType: step.maneuver?.type,
+        maneuverModifier: step.maneuver?.modifier,
+        location: step.maneuver?.location,
       }))
 
       return {
