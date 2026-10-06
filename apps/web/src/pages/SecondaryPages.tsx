@@ -7,6 +7,7 @@ import { api } from '../lib/api'
 import { db } from '../lib/db'
 import { useSession } from '../lib/session'
 import { flushPending } from '../lib/sync'
+import { APP_VERSION, APP_BUILD_DATE, clearAppCacheAndReload } from '../lib/pwa-update'
 import { useUi } from '../stores/ui'
 
 export function FavoritesPage() {
@@ -135,6 +136,25 @@ export function MorePage() {
   const user = useSession((state) => state.user)
   return (
     <Screen title="Mais">
+      <div className="mb-4 rounded-2xl border border-white/10 bg-[#161f28] p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-white">Multivus Maps Santa Juliana</p>
+            <p className="text-xs text-amber-300">Versão {APP_VERSION} • {APP_BUILD_DATE}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void clearAppCacheAndReload()}
+            className="flex items-center gap-1.5 rounded-xl bg-[#f0b429] px-3.5 py-2.5 text-xs font-bold text-slate-900 shadow hover:bg-amber-400 active:scale-95 transition"
+          >
+            🔄 Atualizar App
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          Toque em Atualizar para limpar o cache do celular e carregar novidades instantaneamente.
+        </p>
+      </div>
+
       <div className="grid gap-2">
         <MenuLink to="/entender" label="Entender endereço" />
         <MenuLink to="/perfil" label="Perfil" />
@@ -188,16 +208,31 @@ export function SettingsPage() {
         A base inicial veio do mapa da Prefeitura de Santa Juliana, atualizado em 07/2021. Ruas sem geometria continuam
         não verificadas até alguém conferir no editor.
       </p>
+
+      <div className="mt-6 rounded-2xl border border-white/10 bg-[#1c242c] p-4">
+        <p className="text-sm font-semibold text-white">Versão do Sistema</p>
+        <p className="mt-0.5 text-xs text-slate-400">
+          Versão {APP_VERSION} (Build {APP_BUILD_DATE})
+        </p>
+        <button
+          type="button"
+          className="mt-3 inline-flex h-12 items-center justify-center rounded-xl bg-[#f0b429] px-4 font-semibold text-slate-900 shadow active:scale-95 transition"
+          onClick={() => void clearAppCacheAndReload()}
+        >
+          🔄 Limpar Cache e Forçar Atualização
+        </button>
+      </div>
+
       <button
         type="button"
-        className="mt-6 h-12 rounded-xl bg-white/10 px-4"
+        className="mt-4 h-12 w-full rounded-xl bg-white/10 px-4 text-sm text-slate-300 hover:bg-white/15"
         onClick={() => {
           void db.delete().then(() => {
-            window.location.reload()
+            void clearAppCacheAndReload()
           })
         }}
       >
-        Apagar dados deste aparelho
+        Apagar dados locais deste aparelho
       </button>
     </Screen>
   )

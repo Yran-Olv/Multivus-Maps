@@ -28,6 +28,7 @@ import { linesOf } from '../lib/catalog'
 import { db } from '../lib/db'
 import { useSession } from '../lib/session'
 import { flushPending, isUuid } from '../lib/sync'
+import { APP_VERSION, clearAppCacheAndReload } from '../lib/pwa-update'
 import { useCatalog } from '../hooks/use-catalog'
 import { useUi } from '../stores/ui'
 
@@ -48,6 +49,7 @@ export function HomePage() {
   const location = useUi((state) => state.location)
   const online = useUi((state) => state.online)
   const correctionOpen = useUi((state) => state.correctionOpen)
+  const updateAvailable = useUi((state) => state.updateAvailable)
   const [busy, setBusy] = useState(false)
   const [pin, setPin] = useState<{ latitude: number; longitude: number } | null>(null)
   const [correctionType, setCorrectionType] = useState<CorrectionType>('WRONG_STREET_NAME')
@@ -490,8 +492,30 @@ export function HomePage() {
         /* 2. MODO PADRÃO: Barra de busca e painel de endereço */
         <>
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3">
-            <div className="pointer-events-auto">
-              <SearchBar onFocus={() => navigate('/busca')} />
+            <div className="pointer-events-auto flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <SearchBar onFocus={() => navigate('/busca')} />
+              </div>
+              <button
+                type="button"
+                onClick={() => void clearAppCacheAndReload()}
+                title={`Multivus Maps v${APP_VERSION} - Atualizar e limpar cache`}
+                className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#12181f]/90 text-amber-400 shadow-lg shadow-black/30 border border-white/10 active:scale-95 hover:bg-[#1a232d] transition backdrop-blur"
+                aria-label="Atualizar aplicativo e limpar cache do celular"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                  <path d="M16 21h5v-5" />
+                </svg>
+                {updateAvailable ? (
+                  <span className="absolute top-1 right-1 flex h-3.5 w-3.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500" />
+                  </span>
+                ) : null}
+              </button>
             </div>
             {notice ? (
               <p className="pointer-events-none mt-2 rounded-2xl bg-white/95 px-4 py-3 text-sm text-slate-800 shadow">{notice}</p>

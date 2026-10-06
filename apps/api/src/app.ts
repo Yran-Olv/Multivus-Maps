@@ -2,7 +2,7 @@ import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
 import rateLimit from '@fastify/rate-limit'
 import { createDatabase, refreshTokens, users, type Database } from '@multivus/database'
-import { can, roleSchema, type Action, type Role } from '@multivus/shared'
+import { APP_VERSION, APP_BUILD_ID, can, roleSchema, type Action, type Role } from '@multivus/shared'
 import {
   approveGeometrySchema,
   confirmEntitySchema,
@@ -150,7 +150,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
     }
   }
 
-  app.get('/api/v1/health', async () => ({ status: 'ok' }))
+  app.get('/api/v1/health', async () => ({ status: 'ok', version: APP_VERSION, buildId: APP_BUILD_ID }))
   app.get('/api/v1/ready', async (_request, reply) => {
     try {
       await app.db.execute(sql`select 1`)

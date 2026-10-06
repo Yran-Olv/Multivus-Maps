@@ -34,6 +34,7 @@ type UiState = {
   number: string
   notice: string | null
   correctionOpen: boolean
+  updateAvailable: boolean
   setOnline: (online: boolean) => void
   setPending: (pending: number) => void
   setLocation: (location: { latitude: number; longitude: number } | null) => void
@@ -41,6 +42,7 @@ type UiState = {
   setNumber: (number: string) => void
   setNotice: (notice: string | null) => void
   setCorrectionOpen: (open: boolean) => void
+  setUpdateAvailable: (available: boolean) => void
 }
 
 export const useUi = create<UiState>((set) => ({
@@ -51,6 +53,7 @@ export const useUi = create<UiState>((set) => ({
   number: '',
   notice: null,
   correctionOpen: false,
+  updateAvailable: false,
   setOnline: (online) => set({ online }),
   setPending: (pending) => set({ pending }),
   setLocation: (location) => set({ location }),
@@ -58,4 +61,5 @@ export const useUi = create<UiState>((set) => ({
   setNumber: (number) => set({ number }),
   setNotice: (notice) => set({ notice }),
   setCorrectionOpen: (correctionOpen) => set({ correctionOpen }),
+  setUpdateAvailable: (updateAvailable) => set({ updateAvailable }),
 }))
