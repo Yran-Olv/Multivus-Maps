@@ -270,5 +270,8 @@ export type SearchResult = {
   landmarkId?: string | null
   landmarkName?: string | null
   relationType?: string | null
+  importanceScore?: number | null
+  score?: number | null
+  probableRadiusMeters?: number | null
 }
 

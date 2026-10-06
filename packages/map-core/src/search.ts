@@ -22,12 +22,14 @@ export type SearchableRecord = {
   aliases?: SearchableAlias[]
   extraText?: string | null
   confidence?: number | null
+  importanceScore?: number | null
   category?: string | null
   targetStreetId?: string | null
   targetStreetName?: string | null
   landmarkId?: string | null
   landmarkName?: string | null
   relationType?: string | null
+  probableRadiusMeters?: number | null
 }
 
 export type RankedHit = SearchableRecord & {
@@ -39,6 +41,8 @@ export type RankedHit = SearchableRecord & {
   usedOldName: boolean
   oldNames: string[]
   confidence: number
+  importanceScore: number
+  probableRadiusMeters?: number | null
 }
 
 
@@ -104,44 +108,88 @@ function tokenScore(query: string, candidate: string): number {
   return tokens.every((token) => candidate.includes(token)) ? 78 : 0
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  supermercado: '🛒 Supermercado',
+  farmacia: '💊 Farmácia',
+  posto: '⛽ Posto de Combustível',
+  padaria: '🥖 Padaria & Café',
+  materiais_construcao: '🧱 Materiais de Construção',
+  hospital: '🏥 Saúde & Hospital',
+  rodoviaria: '🚌 Terminal Rodoviário',
+  orgao_publico: '🏛️ Órgão Público',
+  banco: '🏦 Banco / Cooperativa',
+  igreja: '⛪ Igreja / Templo',
+  praca: '🌳 Praça / Referência',
+  comercio: '🏪 Comércio Local',
+  oficina: '🔧 Oficina Mecânica',
+  outro: '📍 Ponto de Referência',
+}
+
 export function searchRecords(
   records: SearchableRecord[],
   rawQuery: string,
   limit = 20,
 ): RankedHit[] {
-  const query = normalizeAddress(parseAddressText(rawQuery).streetQuery)
+  const parsed = parseAddressText(rawQuery)
+  const query = normalizeAddress(parsed.streetQuery)
   if (query.length < 2) return []
+
+  const stripped = query
+    .replace(/\b(?:perto\s+d[aeo]s?|proxim[oa]\s+a[os]?|em\s+frente\s+(?:a[os]?|d[aeo]s?)?|ao\s+lado\s+(?:d[aeo]s?)?|atr[aá]s\s+d[aeo]s?|depois\s+d[aeo]s?|antes\s+d[aeo]s?|no\s+trevo\s+d[aeo]s?|casa\s+[a-zA-Z0-9]+\s*|esquina\s+com)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const targetQuery = stripped.length >= 2 ? stripped : query
 
   const hits: RankedHit[] = []
   for (const record of records) {
+    const normTitle = normalizeAddress(record.title)
+    const normExtra = normalizeAddress(record.extraText ?? '')
+    const normNeigh = record.neighborhoodName ? normalizeAddress(record.neighborhoodName) : ''
+
     const nameScore = Math.max(
-      scoreText(query, normalizeAddress(record.title)),
-      scoreText(query, normalizeAddress(record.extraText ?? '')),
-      record.neighborhoodName ? scoreText(query, normalizeAddress(record.neighborhoodName)) - 8 : 0,
+      scoreText(query, normTitle),
+      scoreText(targetQuery, normTitle),
+      scoreText(query, normExtra),
+      scoreText(targetQuery, normExtra),
+      normNeigh ? Math.max(scoreText(query, normNeigh), scoreText(targetQuery, normNeigh)) - 8 : 0,
     )
+
     let aliasScore = 0
     let matchedAlias: string | null = null
     let matchedAliasType: string | null = null
     for (const alias of record.aliases ?? []) {
-      const current = scoreText(query, normalizeAddress(alias.alias))
+      const normAlias = normalizeAddress(alias.alias)
+      const current = Math.max(
+        scoreText(query, normAlias),
+        scoreText(targetQuery, normAlias),
+      )
       if (current > aliasScore) {
         aliasScore = current
         matchedAlias = alias.alias
         matchedAliasType = alias.aliasType
       }
     }
-    const score = Math.max(nameScore, aliasScore)
-    if (score < 40) continue
+    const rawScore = Math.max(nameScore, aliasScore)
+    if (rawScore < 40) continue
+
+    const importance = record.importanceScore ?? (record.kind === 'landmark' ? 70 : 60)
+    // Pondera a pontuação pelo ranking de importância (estabelecimentos de referência recebem impulso no topo)
+    const score = Math.min(100, Math.round(rawScore + (importance / 100) * 10))
+
     const aliasWins = aliasScore >= nameScore && aliasScore > 0
 
     if (record.kind === 'landmark') {
-      const catLabel = record.category ? record.category.charAt(0).toUpperCase() + record.category.slice(1) : 'Ponto de referência'
+      const catLabel = (record.category && CATEGORY_LABELS[record.category]) || '📍 Ponto de Referência'
+      const badge = importance >= 90 ? ' · Destaque' : ''
       hits.push({
         ...record,
         score,
+        importanceScore: importance,
         matchedAlias: aliasWins ? matchedAlias : null,
         matchedAliasType: aliasWins ? matchedAliasType : null,
-        subtitle: record.neighborhoodName ? `📍 ${catLabel} · Bairro ${record.neighborhoodName}` : `📍 ${catLabel}`,
+        subtitle: record.neighborhoodName
+          ? `${catLabel} · Bairro ${record.neighborhoodName}${badge}`
+          : `${catLabel}${badge}`,
         warning: null,
         usedOldName: false,
         oldNames: [],
@@ -153,14 +201,15 @@ export function searchRecords(
     if (record.kind === 'reference') {
       hits.push({
         ...record,
-        score: Math.max(score, 75), // referências coloquiais exatas devem ter alta relevância
+        score: Math.max(score, 78), // referências coloquiais exatas têm alta relevância para entregadores
+        importanceScore: importance,
         matchedAlias: aliasWins ? matchedAlias : null,
         matchedAliasType: aliasWins ? matchedAliasType : null,
         subtitle: record.targetStreetName ? `🔗 Referência popular → ${record.targetStreetName}` : '🔗 Referência de entrega',
         warning: `Expressão popular utilizada por entregadores e moradores de Santa Juliana.`,
         usedOldName: false,
         oldNames: [],
-        confidence: record.confidence ?? 80,
+        confidence: record.confidence ?? 85,
       })
       continue
     }
@@ -179,6 +228,7 @@ export function searchRecords(
     hits.push({
       ...record,
       score,
+      importanceScore: importance,
       matchedAlias: described.matchedAlias,
       matchedAliasType: aliasWins ? matchedAliasType : null,
       subtitle: described.subtitle ?? (aliasWins ? null : record.neighborhoodName ?? null),
@@ -189,8 +239,7 @@ export function searchRecords(
     })
   }
 
-
-  hits.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, 'pt-BR'))
+  hits.sort((a, b) => b.score - a.score || (b.importanceScore ?? 0) - (a.importanceScore ?? 0) || a.title.localeCompare(b.title, 'pt-BR'))
   return hits.slice(0, limit)
 }
 

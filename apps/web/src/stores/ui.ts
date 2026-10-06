@@ -19,6 +19,10 @@ export type SelectedPlace = {
   longitude: number | null
   targetStreetName?: string | null
   landmarkName?: string | null
+  probableRadiusMeters?: number | null
+  spatialRelationLabel?: string | null
+  importanceScore?: number | null
+  category?: string | null
 }
 
 

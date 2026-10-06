@@ -179,6 +179,8 @@ export async function seed(connectionString: string): Promise<void> {
           longitude?: number
           verified: boolean
           confidenceScore: number
+          importanceScore?: number
+          source?: string
         }>
       }>('landmarks.seed.json')
 
@@ -196,31 +198,72 @@ export async function seed(connectionString: string): Promise<void> {
           ? `ST_SetSRID(ST_MakePoint(${lm.longitude}, ${lm.latitude}), 4326)`
           : 'NULL'
 
-        await client.query(
-          `INSERT INTO landmarks (
-             city_id, name, normalized_name, category, aliases, street_id, street_number,
-             address, description, latitude, longitude, geometry, verified, confidence_score
-           )
-           SELECT $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, ${pointGeo}, $12, $13
-           WHERE NOT EXISTS (
-             SELECT 1 FROM landmarks WHERE city_id = $1 AND normalized_name = $3
-           )`,
-          [
-            cityId,
-            lm.name,
-            normalizeAddress(lm.name),
-            lm.category,
-            JSON.stringify(lm.aliases ?? []),
-            streetId,
-            lm.streetNumber ?? null,
-            lm.address ?? null,
-            lm.description ?? null,
-            lm.latitude ?? null,
-            lm.longitude ?? null,
-            lm.verified ?? false,
-            lm.confidenceScore ?? 70,
-          ],
+        const existingLm = await client.query<{ id: string }>(
+          `SELECT id FROM landmarks WHERE city_id = $1 AND normalized_name = $2 LIMIT 1`,
+          [cityId, normalizeAddress(lm.name)],
         )
+
+        if (existingLm.rows[0]) {
+          await client.query(
+            `UPDATE landmarks SET
+               category = $1,
+               aliases = $2::jsonb,
+               street_id = $3,
+               street_number = $4,
+               address = $5,
+               description = $6,
+               latitude = $7,
+               longitude = $8,
+               geometry = ${pointGeo},
+               verified = $9,
+               confidence_score = $10,
+               importance_score = $11,
+               source = $12,
+               updated_at = now()
+             WHERE id = $13`,
+            [
+              lm.category,
+              JSON.stringify(lm.aliases ?? []),
+              streetId,
+              lm.streetNumber ?? null,
+              lm.address ?? null,
+              lm.description ?? null,
+              lm.latitude ?? null,
+              lm.longitude ?? null,
+              lm.verified ?? false,
+              lm.confidenceScore ?? 70,
+              lm.importanceScore ?? 70,
+              lm.source ?? 'manual',
+              existingLm.rows[0].id,
+            ],
+          )
+        } else {
+          await client.query(
+            `INSERT INTO landmarks (
+               city_id, name, normalized_name, category, aliases, street_id, street_number,
+               address, description, latitude, longitude, geometry, verified, confidence_score,
+               importance_score, source
+             )
+             VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, ${pointGeo}, $12, $13, $14, $15)`,
+            [
+              cityId,
+              lm.name,
+              normalizeAddress(lm.name),
+              lm.category,
+              JSON.stringify(lm.aliases ?? []),
+              streetId,
+              lm.streetNumber ?? null,
+              lm.address ?? null,
+              lm.description ?? null,
+              lm.latitude ?? null,
+              lm.longitude ?? null,
+              lm.verified ?? false,
+              lm.confidenceScore ?? 70,
+              lm.importanceScore ?? 70,
+              lm.source ?? 'manual',
+            ],
+          )
+        }
       }
     } catch (e) {
       console.warn('Aviso: landmarks.seed.json não encontrado ou erro:', e)
@@ -259,28 +302,55 @@ export async function seed(connectionString: string): Promise<void> {
           landmarkId = lmRes.rows[0]?.id ?? null
         }
 
-        await client.query(
-          `INSERT INTO local_references (
-             city_id, popular_phrase, normalized_phrase, relation_type,
-             target_street_id, landmark_id, description, confirmations_count, confidence_score, verified
-           )
-           SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-           WHERE NOT EXISTS (
-             SELECT 1 FROM local_references WHERE city_id = $1 AND normalized_phrase = $3
-           )`,
-          [
-            cityId,
-            ref.popularPhrase,
-            normalizeAddress(ref.popularPhrase),
-            ref.relationType,
-            targetStreetId,
-            landmarkId,
-            ref.description ?? null,
-            ref.confirmationsCount ?? 1,
-            ref.confidenceScore ?? 70,
-            ref.verified ?? false,
-          ],
+        const existingRef = await client.query<{ id: string }>(
+          `SELECT id FROM local_references WHERE city_id = $1 AND normalized_phrase = $2 LIMIT 1`,
+          [cityId, normalizeAddress(ref.popularPhrase)],
         )
+
+        if (existingRef.rows[0]) {
+          await client.query(
+            `UPDATE local_references SET
+               relation_type = $1,
+               target_street_id = $2,
+               landmark_id = $3,
+               description = $4,
+               confirmations_count = $5,
+               confidence_score = $6,
+               verified = $7,
+               updated_at = now()
+             WHERE id = $8`,
+            [
+              ref.relationType,
+              targetStreetId,
+              landmarkId,
+              ref.description ?? null,
+              ref.confirmationsCount ?? 1,
+              ref.confidenceScore ?? 70,
+              ref.verified ?? false,
+              existingRef.rows[0].id,
+            ],
+          )
+        } else {
+          await client.query(
+            `INSERT INTO local_references (
+               city_id, popular_phrase, normalized_phrase, relation_type,
+               target_street_id, landmark_id, description, confirmations_count, confidence_score, verified
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [
+              cityId,
+              ref.popularPhrase,
+              normalizeAddress(ref.popularPhrase),
+              ref.relationType,
+              targetStreetId,
+              landmarkId,
+              ref.description ?? null,
+              ref.confirmationsCount ?? 1,
+              ref.confidenceScore ?? 70,
+              ref.verified ?? false,
+            ],
+          )
+        }
       }
     } catch (e) {
       console.warn('Aviso: local-references.seed.json não encontrado ou erro:', e)

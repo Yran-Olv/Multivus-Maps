@@ -26,6 +26,11 @@ type AddressBottomSheetProps = {
   activeRouteSummary?: { distanceKm: number; durationMin: number; nextInstruction?: string } | null
   onClearRoute?: () => void
   routeFailed?: boolean
+  probableRadiusMeters?: number | null
+  spatialRelationLabel?: string | null
+  landmarkName?: string | null
+  importanceScore?: number | null
+  category?: string | null
 }
 
 export function AddressBottomSheet(props: AddressBottomSheetProps) {
@@ -49,6 +54,11 @@ export function AddressBottomSheet(props: AddressBottomSheetProps) {
         source={props.source}
         sourceDate={props.sourceDate}
         verified={props.verified}
+        probableRadiusMeters={props.probableRadiusMeters}
+        spatialRelationLabel={props.spatialRelationLabel}
+        landmarkName={props.landmarkName}
+        importanceScore={props.importanceScore}
+        category={props.category}
       />
       <label className="mt-4 block text-sm text-slate-600">
         Número

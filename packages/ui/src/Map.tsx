@@ -34,6 +34,7 @@ type MapProps = {
   showMultivus?: boolean
   showOsm?: boolean
   userLocation?: { longitude: number; latitude: number } | null
+  radiusArea?: { longitude: number; latitude: number; radiusMeters: number; label?: string } | null
   onClick?: (point: { longitude: number; latitude: number }) => void
   onMove?: (center: { longitude: number; latitude: number }) => void
   className?: string
@@ -57,6 +58,7 @@ export function Map({
   showMultivus = true,
   showOsm = true,
   userLocation,
+  radiusArea = null,
   onClick,
   onMove,
   className,
@@ -205,6 +207,31 @@ export function Map({
           'circle-stroke-color': '#ffffff',
         },
       })
+
+      // 5. Camada de Raio de Referência Local / Comércio
+      map.addSource('landmark-radius', {
+        type: 'geojson',
+        data: emptyCollection(),
+      })
+      map.addLayer({
+        id: 'landmark-radius-fill',
+        type: 'fill',
+        source: 'landmark-radius',
+        paint: {
+          'fill-color': '#f59e0b',
+          'fill-opacity': 0.16,
+        },
+      })
+      map.addLayer({
+        id: 'landmark-radius-line',
+        type: 'line',
+        source: 'landmark-radius',
+        paint: {
+          'line-color': '#d97706',
+          'line-width': 2,
+          'line-dasharray': [3, 2],
+        },
+      })
     })
 
     map.on('click', (event) => {
@@ -316,6 +343,24 @@ export function Map({
     source?.setData({ type: 'FeatureCollection', features })
   }, [points, userLocation])
 
+  // Atualização do Raio de Referência Local / Comércio
+  useEffect(() => {
+    const map = mapRef.current
+    const source = map?.getSource('landmark-radius') as GeoJSONSource | undefined
+    if (!source) return
+
+    if (!radiusArea || !radiusArea.radiusMeters || radiusArea.longitude === null || radiusArea.latitude === null) {
+      source.setData(emptyCollection())
+      return
+    }
+
+    const circleFeature = createGeoJsonCircle([radiusArea.longitude, radiusArea.latitude], radiusArea.radiusMeters)
+    source.setData({
+      type: 'FeatureCollection',
+      features: [circleFeature],
+    })
+  }, [radiusArea])
+
   if (unavailable) {
     return (
       <div className={`grid place-items-center bg-[#17202a] px-6 text-center text-slate-200 ${className ?? 'h-full w-full'}`}>
@@ -325,6 +370,28 @@ export function Map({
   }
 
   return <div ref={containerRef} className={className ?? 'h-full w-full'} />
+}
+
+function createGeoJsonCircle(center: [number, number], radiusInMeters: number, points = 32) {
+  const [lng, lat] = center
+  const coords: [number, number][] = []
+  const distanceX = radiusInMeters / (111320 * Math.cos((lat * Math.PI) / 180))
+  const distanceY = radiusInMeters / 110540
+
+  for (let i = 0; i <= points; i++) {
+    const theta = (i / points) * (2 * Math.PI)
+    const x = distanceX * Math.cos(theta)
+    const y = distanceY * Math.sin(theta)
+    coords.push([lng + x, lat + y])
+  }
+  return {
+    type: 'Feature' as const,
+    properties: {},
+    geometry: {
+      type: 'Polygon' as const,
+      coordinates: [coords],
+    },
+  }
 }
 
 function emptyCollection() {

@@ -141,11 +141,13 @@ export async function listLandmarks(db: Database, category?: string) {
       longitude: landmarks.longitude,
       verified: landmarks.verified,
       confidenceScore: landmarks.confidenceScore,
+      importanceScore: landmarks.importanceScore,
+      source: landmarks.source,
       createdAt: landmarks.createdAt,
     })
     .from(landmarks)
     .where(category ? and(eq(landmarks.active, true), eq(landmarks.category, category)) : eq(landmarks.active, true))
-    .orderBy(landmarks.name)
+    .orderBy(desc(landmarks.importanceScore), landmarks.name)
 
   return query
 }
@@ -348,8 +350,16 @@ export async function getStreet(db: Database, id: string): Promise<StreetRecord 
 }
 
 export async function searchCatalog(db: Database, rawQuery: string, limit: number): Promise<SearchResult[]> {
-  const term = normalizeAddress(parseAddressText(rawQuery).streetQuery)
+  const parsed = parseAddressText(rawQuery)
+  const term = normalizeAddress(parsed.streetQuery)
   if (term.length < 2) return []
+
+  const stripped = term
+    .replace(/\b(?:perto\s+d[aeo]s?|proxim[oa]\s+a[os]?|em\s+frente\s+(?:a[os]?|d[aeo]s?)?|ao\s+lado\s+(?:d[aeo]s?)?|atr[aá]s\s+d[aeo]s?|depois\s+d[aeo]s?|antes\s+d[aeo]s?|no\s+trevo\s+d[aeo]s?|casa\s+[a-zA-Z0-9]+\s*|esquina\s+com)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const targetTerm = stripped.length >= 2 ? stripped : term
+
   const streetsResult = await db.execute<{
     id: string
     officialName: string
@@ -463,6 +473,8 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     neighborhoodName: string | null
     verified: boolean
     confidenceScore: number
+    importanceScore: number
+    source: string
     score: number
   }>(sql`
     SELECT
@@ -477,10 +489,16 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
       n.name AS "neighborhoodName",
       l.verified,
       l.confidence_score AS "confidenceScore",
-      GREATEST(
-        similarity(l.normalized_name, ${term}),
-        similarity(lower(coalesce(l.description, '')), ${term}),
-        similarity(lower(coalesce(l.category, '')), ${term})
+      l.importance_score AS "importanceScore",
+      l.source,
+      (
+        GREATEST(
+          similarity(l.normalized_name, ${term}),
+          similarity(l.normalized_name, ${targetTerm}),
+          similarity(lower(coalesce(l.description, '')), ${term}),
+          similarity(lower(coalesce(l.description, '')), ${targetTerm}),
+          similarity(lower(coalesce(l.category, '')), ${term})
+        ) + (l.importance_score::float / 250.0)
       ) AS score
     FROM landmarks l
     LEFT JOIN streets s ON s.id = l.street_id
@@ -488,9 +506,12 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     WHERE l.active = true
       AND (
         l.normalized_name LIKE ${'%' + term + '%'}
+        OR l.normalized_name LIKE ${'%' + targetTerm + '%'}
         OR lower(coalesce(l.description, '')) LIKE ${'%' + term + '%'}
         OR l.aliases::text ILIKE ${'%' + term + '%'}
+        OR l.aliases::text ILIKE ${'%' + targetTerm + '%'}
         OR similarity(l.normalized_name, ${term}) > 0.25
+        OR similarity(l.normalized_name, ${targetTerm}) > 0.25
       )
     ORDER BY score DESC
     LIMIT ${limit}
@@ -558,6 +579,8 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     usedOldName: false,
     oldNames: [],
     confidence: Number(row.confidenceScore) || 80,
+    score: Number(row.score) || 0,
+    importanceScore: 85,
     targetStreetId: row.targetStreetId,
     targetStreetName: row.targetStreetName,
     landmarkId: row.landmarkId,
@@ -577,7 +600,7 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
       matchedAlias: null,
       matchedAliasType: null,
       verified: row.verified,
-      source: 'Cadastro Municipal / Local',
+      source: row.source || 'Cadastro Municipal / Local',
       sourceDate: null,
       latitude: row.latitude,
       longitude: row.longitude,
@@ -586,6 +609,8 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
       usedOldName: false,
       oldNames: [],
       confidence: Number(row.confidenceScore) || 90,
+      importanceScore: Number(row.importanceScore) || 70,
+      score: Number(row.score) || 0,
       category: row.category,
       targetStreetId: row.streetId,
       targetStreetName: row.streetName,
@@ -626,6 +651,8 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
       usedOldName: described.usedOldName,
       oldNames: described.oldNames,
       confidence: described.confidence,
+      score: Number(row.score) || 0,
+      importanceScore: 60,
     }
   })
 
@@ -648,6 +675,8 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     usedOldName: false,
     oldNames: [],
     confidence: confidenceOf({ verified: row.verified, source: row.source }),
+    score: Number(row.score) || 0,
+    importanceScore: 50,
   }))
 
   const neighborhoodHits: SearchResult[] = rowsOf(neighborhoodResult).map((row) => ({
@@ -669,6 +698,8 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     usedOldName: false,
     oldNames: [],
     confidence: 0,
+    score: Number(row.score) || 0,
+    importanceScore: 40,
   }))
 
   const allHits = [
@@ -678,6 +709,7 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     ...placeHits,
     ...neighborhoodHits,
   ]
+  allHits.sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.importanceScore ?? 0) - (a.importanceScore ?? 0))
   const topHit = allHits[0] ?? null
 
   // Aprendizado local: registra o termo buscado e o resultado

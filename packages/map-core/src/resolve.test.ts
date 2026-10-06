@@ -40,6 +40,13 @@ describe('entender endereço', () => {
     expect(parsed.reference).toBe('casa azul perto da igreja')
   })
 
+  it('não extrai número de nomes comerciais como Posto 2000', () => {
+    const parsed = parseAddressText('Casa azul atrás do Posto 2000')
+    expect(parsed.streetQuery).toBe('Posto 2000')
+    expect(parsed.number).toBeNull()
+    expect(parsed.reference).toBe('Casa azul, atrás do Posto 2000')
+  })
+
   it('trata o nome antigo e o nome atual como a mesma rua', () => {
     const queries = ['Lírios', 'Rua Lírios', 'R. Lírios', 'rua lirios', 'antiga Lírios', 'Rua Lírios, 120']
     for (const query of queries) {
@@ -146,6 +153,102 @@ describe('entender endereço', () => {
     expect(resolvedWithLandmark.officialName).toBe('Rua Orivaldo José Pires')
     expect(resolvedWithLandmark.number).toBe('120')
     expect(resolvedWithLandmark.matchedLandmark).toBe('Igreja Matriz')
+  })
+
+  it('entende mensagens de entregadores com referências comerciais e calcula raio provável', () => {
+    const intelligenceRecords: SearchableRecord[] = [
+      ...records(),
+      {
+        id: 'lm-barbosao',
+        kind: 'landmark',
+        title: 'Barbosão Supermercado - Santa Juliana MG',
+        category: 'supermercado',
+        importanceScore: 95,
+        verified: true,
+        latitude: -19.315,
+        longitude: -47.5285,
+        aliases: [{ alias: 'Barbosão', aliasType: 'POPULAR_NAME' }, { alias: 'Barbosao', aliasType: 'POPULAR_NAME' }],
+        targetStreetId: normalizeAddress('Avenida Antônio Fortunato da Silva'),
+        targetStreetName: 'Avenida Antônio Fortunato da Silva',
+      },
+      {
+        id: 'lm-posto2000',
+        kind: 'landmark',
+        title: 'POSTO 2000 STA JULIANA MG',
+        category: 'posto',
+        importanceScore: 95,
+        verified: true,
+        latitude: -19.3134,
+        longitude: -47.5301,
+        aliases: [{ alias: 'Posto 2000', aliasType: 'POPULAR_NAME' }],
+        targetStreetId: normalizeAddress('Rua José Pedro Borges'),
+        targetStreetName: 'Rua José Pedro Borges',
+      },
+      {
+        id: 'lm-farmacunha',
+        kind: 'landmark',
+        title: 'Farma Cunha',
+        category: 'farmacia',
+        importanceScore: 90,
+        verified: true,
+        latitude: -19.3096,
+        longitude: -47.5235,
+        aliases: [{ alias: 'Farmácia Cunha', aliasType: 'POPULAR_NAME' }],
+        targetStreetId: normalizeAddress('Rua Professor Orestes'),
+        targetStreetName: 'Rua Professor Orestes',
+      },
+      {
+        id: 'lm-rodrigues',
+        kind: 'landmark',
+        title: 'SR - Supermercado Rodrigues',
+        category: 'supermercado',
+        importanceScore: 95,
+        verified: true,
+        aliases: [{ alias: 'Supermercado Rodrigues', aliasType: 'POPULAR_NAME' }],
+        targetStreetId: normalizeAddress('Avenida Antônio Fortunato da Silva'),
+        targetStreetName: 'Avenida Antônio Fortunato da Silva',
+      },
+      {
+        id: 'lm-rodoviaria',
+        kind: 'landmark',
+        title: 'Terminal Rodoviário de Santa Juliana',
+        category: 'rodoviaria',
+        importanceScore: 100,
+        verified: true,
+        aliases: [{ alias: 'rodoviária', aliasType: 'POPULAR_NAME' }, { alias: 'rodoviaria', aliasType: 'POPULAR_NAME' }],
+        targetStreetId: normalizeAddress('Rua Professor Orestes'),
+        targetStreetName: 'Rua Professor Orestes',
+      },
+    ]
+
+    // Caso 1: "perto do Barbosão" -> Raio provável de 200m
+    const resBarbosao = resolveAddress(intelligenceRecords, 'perto do Barbosão')
+    expect(resBarbosao.matchedLandmark).toBe('Barbosão Supermercado - Santa Juliana MG')
+    expect(resBarbosao.probableRadiusMeters).toBe(200)
+    expect(resBarbosao.spatialRelation).toBe('NEAR')
+
+    // Caso 2: "atrás da Farma Cunha" -> Localiza a farmácia primeiro, raio provável de 100m
+    const resCunha = resolveAddress(intelligenceRecords, 'atrás da Farma Cunha')
+    expect(resCunha.matchedLandmark).toBe('Farma Cunha')
+    expect(resCunha.probableRadiusMeters).toBe(100)
+    expect(resCunha.spatialRelation).toBe('BEHIND')
+
+    // Caso 3: "Casa azul atrás do Posto 2000" -> Posto 2000, 100m, referência preservada
+    const resPosto = resolveAddress(intelligenceRecords, 'Casa azul atrás do Posto 2000')
+    expect(resPosto.matchedLandmark).toBe('POSTO 2000 STA JULIANA MG')
+    expect(resPosto.probableRadiusMeters).toBe(100)
+    expect(resPosto.spatialRelation).toBe('BEHIND')
+    expect(resPosto.reference).toMatch(/casa azul/i)
+
+    // Caso 4: Mensagem complexa com múltiplos comércios e nome antigo
+    const complexMsg =
+      'Rua Lírios 120 perto do Barbosão atrás da rodoviária ao lado da Farma Cunha em frente ao Posto 2000 depois do Supermercado Rodrigues'
+    const resComplex = resolveAddress(intelligenceRecords, complexMsg)
+    expect(resComplex.officialName).toBe('Rua Orivaldo José Pires')
+    expect(resComplex.number).toBe('120')
+    expect(resComplex.usedOldName).toBe(true)
+    expect(resComplex.matchedLandmark).toBeDefined()
+    expect(resComplex.additionalLandmarks.length).toBeGreaterThanOrEqual(2)
   })
 })
 

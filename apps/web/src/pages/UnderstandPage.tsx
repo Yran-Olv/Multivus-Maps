@@ -41,6 +41,11 @@ export function UnderstandPage() {
         verified: resolved.hit.verified,
         latitude: point?.latitude ?? null,
         longitude: point?.longitude ?? null,
+        probableRadiusMeters: resolved.probableRadiusMeters,
+        spatialRelationLabel: resolved.spatialRelationLabel,
+        landmarkName: resolved.matchedLandmark,
+        importanceScore: resolved.matchedLandmarkImportance,
+        category: resolved.matchedLandmarkCategory,
       },
       resolved.number ?? '',
     )
@@ -107,6 +112,27 @@ export function UnderstandPage() {
               </div>
             ) : null}
 
+            {resolved.probableRadiusMeters ? (
+              <div className="mt-3 rounded-xl bg-amber-50 p-3 border border-amber-200 text-amber-950">
+                <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-amber-800">
+                  <span>🎯 Raio Provável de Entrega</span>
+                </div>
+                <p className="mt-1 text-sm font-semibold">
+                  {resolved.spatialRelationLabel ?? `Raio de ~${resolved.probableRadiusMeters} metros ao redor de ${resolved.matchedLandmark}`}
+                </p>
+                <p className="mt-0.5 text-xs text-amber-800/80">
+                  O mapa exibirá o círculo da área estimada de ~{resolved.probableRadiusMeters}m para guiar o entregador.
+                </p>
+              </div>
+            ) : null}
+
+            {resolved.additionalLandmarks?.length ? (
+              <div className="mt-3 rounded-xl bg-slate-100 p-2.5 text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Outros pontos citados:</span>{' '}
+                {resolved.additionalLandmarks.join(', ')}
+              </div>
+            ) : null}
+
             {resolved.reference ? (
               <div className="mt-3 text-sm text-slate-700">
                 <span className="font-semibold text-slate-900">Complemento / Referência do cliente:</span>{' '}
@@ -138,7 +164,7 @@ export function UnderstandPage() {
 
 function allCatalogRecords(catalog: {
   streets?: Array<{ id: string; officialName: string; streetType: string; neighborhoodName: string | null; verified: boolean; source: string | null; sourceDate: string | null; geometry: unknown; aliases: { alias: string; aliasType: string }[]; confidence?: number | null }>
-  landmarks?: Array<{ id: string; name: string; category: string; aliases: string[]; streetId: string | null; streetNumber: string | null; neighborhoodName: string | null; address: string | null; description: string | null; latitude: number | null; longitude: number | null; verified: boolean; confidence: number }>
+  landmarks?: Array<{ id: string; name: string; category: string; aliases: string[]; streetId: string | null; streetNumber: string | null; neighborhoodName: string | null; address: string | null; description: string | null; latitude: number | null; longitude: number | null; verified: boolean; confidence: number; importanceScore?: number }>
   localReferences?: Array<{ id: string; popularPhrase: string; relationType: string; targetStreetId: string | null; targetStreetName: string | null; landmarkId: string | null; landmarkName: string | null; description: string | null; confirmationsCount: number; confidence: number; verified: boolean }>
 } | undefined): SearchableRecord[] {
   if (!catalog) return []
@@ -172,6 +198,7 @@ function allCatalogRecords(catalog: {
       neighborhoodName: lm.neighborhoodName,
       verified: lm.verified,
       confidence: lm.confidence,
+      importanceScore: lm.importanceScore ?? 70,
       latitude: lm.latitude,
       longitude: lm.longitude,
       targetStreetId: lm.streetId,

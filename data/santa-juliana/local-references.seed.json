@@ -1,14 +1,184 @@
 {
-  "source": "Linguagem Popular de Entregadores de Santa Juliana",
+  "source": "Linguagem Popular e Inteligência de Referências de Entregadores de Santa Juliana",
   "sourceDate": "2026-10",
   "references": [
+    {
+      "popularPhrase": "Perto do Barbosão",
+      "relationType": "NEAR",
+      "targetStreetName": "Avenida Antônio Fortunato da Silva",
+      "landmarkName": "Barbosão Supermercado - Santa Juliana MG",
+      "description": "Entorno do Supermercado Barbosão no Bairro Palmeiras (raio provável: 200 metros)",
+      "confirmationsCount": 15,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Atrás do Barbosão",
+      "relationType": "BEHIND",
+      "targetStreetName": "Avenida Antônio Fortunato da Silva",
+      "landmarkName": "Barbosão Supermercado - Santa Juliana MG",
+      "description": "Região posterior e quadras residenciais atrás do Barbosão (raio provável: 100 metros)",
+      "confirmationsCount": 12,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Ao lado do Barbosão",
+      "relationType": "NEXT_TO",
+      "targetStreetName": "Avenida Antônio Fortunato da Silva",
+      "landmarkName": "Barbosão Supermercado - Santa Juliana MG",
+      "description": "Comércios e residências vizinhas ao Barbosão",
+      "confirmationsCount": 10,
+      "confidenceScore": 95,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Atrás da Rodoviária",
+      "relationType": "BEHIND",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Terminal Rodoviário de Santa Juliana",
+      "description": "Entorno posterior ao terminal rodoviário",
+      "confirmationsCount": 14,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto da Rodoviária",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Terminal Rodoviário de Santa Juliana",
+      "description": "Região central próxima à rodoviária (raio provável: 200 metros)",
+      "confirmationsCount": 12,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Ao lado da Farma Cunha",
+      "relationType": "NEXT_TO",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Farma Cunha",
+      "description": "Vizinho imediato à farmácia Farma Cunha na Rua Professor Orestes",
+      "confirmationsCount": 11,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto da Farma Cunha",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Farma Cunha",
+      "description": "Trecho da Rua Professor Orestes próximo à Farma Cunha (raio provável: 150 metros)",
+      "confirmationsCount": 10,
+      "confidenceScore": 95,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Atrás da Farma Cunha",
+      "relationType": "BEHIND",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Farma Cunha",
+      "description": "Área residencial atrás da farmácia Farma Cunha",
+      "confirmationsCount": 9,
+      "confidenceScore": 95,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Em frente ao Posto 2000",
+      "relationType": "IN_FRONT_OF",
+      "targetStreetName": "Rua José Pedro Borges",
+      "landmarkName": "POSTO 2000 STA JULIANA MG",
+      "description": "Localização de frente ao Auto Posto 2000",
+      "confirmationsCount": 13,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Atrás do Posto 2000",
+      "relationType": "BEHIND",
+      "targetStreetName": "Rua José Pedro Borges",
+      "landmarkName": "POSTO 2000 STA JULIANA MG",
+      "description": "Residências e via paralela atrás do Posto 2000 (raio provável: 100 metros)",
+      "confirmationsCount": 12,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto do Posto 2000",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua José Pedro Borges",
+      "landmarkName": "POSTO 2000 STA JULIANA MG",
+      "description": "Região central ao redor do Posto 2000 (raio provável: 200 metros)",
+      "confirmationsCount": 14,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Depois do Supermercado Rodrigues",
+      "relationType": "NEAR",
+      "targetStreetName": "Avenida Antônio Fortunato da Silva",
+      "landmarkName": "SR - Supermercado Rodrigues",
+      "description": "Sentido bairro José Rodrigues após o supermercado",
+      "confirmationsCount": 11,
+      "confidenceScore": 95,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto do Supermercado Rodrigues",
+      "relationType": "NEAR",
+      "targetStreetName": "Avenida Antônio Fortunato da Silva",
+      "landmarkName": "SR - Supermercado Rodrigues",
+      "description": "Região do Bairro José Rodrigues ao redor do Supermercado Rodrigues",
+      "confirmationsCount": 12,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "No Trevo do Posto Cabral",
+      "relationType": "ON_STREET",
+      "targetStreetName": "Avenida Ennio Gonçalves",
+      "landmarkName": "Posto Cabral",
+      "description": "Entrada principal da cidade no entroncamento com a BR-452",
+      "confirmationsCount": 15,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto do Posto Cabral",
+      "relationType": "NEAR",
+      "targetStreetName": "Avenida Ennio Gonçalves",
+      "landmarkName": "Posto Cabral",
+      "description": "Imediações do Posto Cabral e trevo de acesso",
+      "confirmationsCount": 10,
+      "confidenceScore": 95,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto do Posto Retão",
+      "relationType": "NEAR",
+      "targetStreetName": "Avenida Ennio Gonçalves",
+      "landmarkName": "Garimpo Auto Posto Retão",
+      "description": "Imediações do posto Garimpo Retão na rodovia",
+      "confirmationsCount": 9,
+      "confidenceScore": 90,
+      "verified": true
+    },
     {
       "popularPhrase": "Rua do Hospital",
       "relationType": "ON_STREET",
       "targetStreetName": "Rua São Vicente de Paula",
       "landmarkName": "Hospital Municipal de Santa Juliana",
       "description": "Trecho da Rua São Vicente de Paula onde fica o Hospital Municipal",
-      "confirmationsCount": 10,
+      "confirmationsCount": 15,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto do Hospital",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua São Vicente de Paula",
+      "landmarkName": "Hospital Municipal de Santa Juliana",
+      "description": "Região residencial e médica ao redor do hospital",
+      "confirmationsCount": 12,
       "confidenceScore": 100,
       "verified": true
     },
@@ -18,7 +188,7 @@
       "targetStreetName": "Rua São Vicente de Paula",
       "landmarkName": "Laboratório Bioklin",
       "description": "Trecho da Rua São Vicente de Paula em frente ao laboratório Bioklin",
-      "confirmationsCount": 8,
+      "confirmationsCount": 10,
       "confidenceScore": 100,
       "verified": true
     },
@@ -28,28 +198,8 @@
       "targetStreetName": "Rua São Vicente de Paula",
       "landmarkName": "Cemitério Municipal Campo da Paz",
       "description": "Via que dá acesso direto ao Cemitério Municipal",
-      "confirmationsCount": 9,
+      "confirmationsCount": 11,
       "confidenceScore": 100,
-      "verified": true
-    },
-    {
-      "popularPhrase": "Atrás da Rodoviária",
-      "relationType": "BEHIND",
-      "targetStreetName": "Rua Professor Orestes",
-      "landmarkName": "Terminal Rodoviário de Santa Juliana",
-      "description": "Entorno posterior ao terminal rodoviário",
-      "confirmationsCount": 7,
-      "confidenceScore": 95,
-      "verified": true
-    },
-    {
-      "popularPhrase": "Perto da Lotérica",
-      "relationType": "NEAR",
-      "targetStreetName": "Rua Antônio Rezende",
-      "landmarkName": "Lotérica Trevo da Sorte",
-      "description": "Região central próxima à casa lotérica",
-      "confirmationsCount": 6,
-      "confidenceScore": 90,
       "verified": true
     },
     {
@@ -58,17 +208,27 @@
       "targetStreetName": "Rua Professor Orestes",
       "landmarkName": "Prefeitura Municipal de Santa Juliana",
       "description": "Vizinhança imediata ao prédio da Prefeitura",
-      "confirmationsCount": 8,
+      "confirmationsCount": 12,
       "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto da Lotérica",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua Antônio Resende",
+      "landmarkName": "Lotérica Trevo da Sorte",
+      "description": "Região central próxima à casa lotérica",
+      "confirmationsCount": 10,
+      "confidenceScore": 95,
       "verified": true
     },
     {
       "popularPhrase": "Perto do Banco do Brasil",
       "relationType": "NEAR",
-      "targetStreetName": "Rua Antônio Rezende",
+      "targetStreetName": "Rua Antônio Resende",
       "landmarkName": "Banco do Brasil",
       "description": "Quadra do Banco do Brasil no centro",
-      "confirmationsCount": 9,
+      "confirmationsCount": 12,
       "confidenceScore": 100,
       "verified": true
     },
@@ -78,7 +238,7 @@
       "targetStreetName": "Avenida Ennio Gonçalves",
       "landmarkName": "Sicoob Crediara",
       "description": "Avenida Ênio Gonçalves próximo ao Sicoob",
-      "confirmationsCount": 7,
+      "confirmationsCount": 10,
       "confidenceScore": 95,
       "verified": true
     },
@@ -88,17 +248,17 @@
       "targetStreetName": "Avenida Ennio Gonçalves",
       "landmarkName": "Constrói Santa Juliana",
       "description": "Região da Avenida Ênio Gonçalves próxima à Constrói",
-      "confirmationsCount": 7,
+      "confirmationsCount": 10,
       "confidenceScore": 95,
       "verified": true
     },
     {
       "popularPhrase": "Rua do Kevin Gás",
       "relationType": "ON_STREET",
-      "targetStreetName": "Rua Jovelino Cândido da Mota",
+      "targetStreetName": "Rua Jovelino Cândido Mota",
       "landmarkName": "Kevin Gás",
       "description": "Rua no bairro Primavera onde se localiza o depósito Kevin Gás",
-      "confirmationsCount": 10,
+      "confirmationsCount": 12,
       "confidenceScore": 100,
       "verified": true
     },
@@ -108,7 +268,67 @@
       "targetStreetName": "Praça Umbelina Rodrigues Ferreira",
       "landmarkName": "Igreja Matriz Santa Juliana de Falconieri",
       "description": "Entorno da praça central da matriz",
+      "confirmationsCount": 14,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto da Praça Central",
+      "relationType": "NEAR",
+      "targetStreetName": "Praça Umbelina Rodrigues Ferreira",
+      "landmarkName": "Praça Central / Praça da Matriz",
+      "description": "Área da Praça Central no Centro",
+      "confirmationsCount": 13,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto do Café do Berto",
+      "relationType": "NEAR",
+      "targetStreetName": "Avenida Maria do Prado Silva",
+      "landmarkName": "Cafe do Berto",
+      "description": "Avenida Maria do Prado Silva no Bairro José Rodrigues",
+      "confirmationsCount": 10,
+      "confidenceScore": 95,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto da Doce Magia",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Doce Magia",
+      "description": "Região da confeitaria Doce Magia no Centro",
+      "confirmationsCount": 9,
+      "confidenceScore": 90,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto do Super Pão",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Super Pão",
+      "description": "Rua Professor Orestes próximo à padaria Super Pão",
+      "confirmationsCount": 9,
+      "confidenceScore": 90,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto dos Correios",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Agência dos Correios",
+      "description": "Quadra dos Correios na Rua Professor Orestes",
       "confirmationsCount": 12,
+      "confidenceScore": 100,
+      "verified": true
+    },
+    {
+      "popularPhrase": "Perto da Delegacia",
+      "relationType": "NEAR",
+      "targetStreetName": "Rua Professor Orestes",
+      "landmarkName": "Delegacia de Polícia Civil de Santa Juliana",
+      "description": "Rua Professor Orestes próximo à Delegacia de Polícia",
+      "confirmationsCount": 11,
       "confidenceScore": 100,
       "verified": true
     }

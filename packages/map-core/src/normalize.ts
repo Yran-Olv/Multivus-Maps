@@ -19,6 +19,7 @@ const STREET_PREFIXES = new Set([
 const NAME_QUALIFIERS = new Set(['antiga', 'antigo'])
 
 export function stripAccents(value: string): string {
+  if (!value) return ''
   return value.normalize('NFD').replace(/\p{M}/gu, '')
 }
 

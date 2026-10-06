@@ -63,13 +63,6 @@ export function HomePage() {
   const isRecalculatingRef = useRef(false)
 
   useEffect(() => {
-    setGoMessage(null)
-    setActiveRoute(null)
-    setRouteFailed(false)
-    stopNavigation()
-  }, [selected?.id])
-
-  useEffect(() => {
     return () => {
       watchUnsubRef.current?.()
       platform.voice.stop()
@@ -88,9 +81,70 @@ export function HomePage() {
         .flatMap((street) => linesOf(street.id, street.geometry)),
     [catalog.data?.streets],
   )
-  const points = pin
-    ? [{ id: 'correction-pin', longitude: pin.longitude, latitude: pin.latitude, color: '#e15b64' }]
-    : []
+  const points = useMemo(() => {
+    const list: Array<{ id: string; longitude: number; latitude: number; color?: string }> = []
+    if (pin) {
+      list.push({ id: 'correction-pin', longitude: pin.longitude, latitude: pin.latitude, color: '#e15b64' })
+    }
+    if (selected && selected.latitude !== null && selected.longitude !== null) {
+      list.push({ id: 'destination-pin', longitude: selected.longitude, latitude: selected.latitude, color: '#f59e0b' })
+    }
+    return list
+  }, [pin, selected])
+
+  useEffect(() => {
+    setGoMessage(null)
+    setActiveRoute(null)
+    setRouteFailed(false)
+    stopNavigation()
+
+    if (!selected) return
+
+    // Centraliza no mapa e traça o trajeto automaticamente
+    if (selected.latitude !== null && selected.longitude !== null) {
+      mapRef.current?.flyTo(selected.longitude, selected.latitude, 16)
+      void calculateAndShowRoute(selected)
+    }
+  }, [selected?.id])
+
+  async function calculateAndShowRoute(target: typeof selected) {
+    if (!target || target.latitude === null || target.longitude === null) return
+
+    let userPos = location
+    if (!userPos) {
+      try {
+        userPos = await platform.location.getCurrentPosition()
+        useUi.getState().setLocation(userPos)
+      } catch {
+        // Fallback: Centro urbano de Santa Juliana
+        userPos = { latitude: -19.30889, longitude: -47.52417 }
+      }
+    }
+
+    setGoMessage('Calculando trajeto no mapa...')
+    setRouteFailed(false)
+    try {
+      const routeResult = await routing.calculateRoute(
+        { latitude: userPos.latitude, longitude: userPos.longitude },
+        { latitude: target.latitude, longitude: target.longitude },
+      )
+
+      if (routeResult.status === 'ok' && routeResult.geometry) {
+        setActiveRoute(routeResult)
+        mapRef.current?.fitBounds(routeResult.geometry.coordinates)
+        setGoMessage(
+          `Trajeto traçado: ${(routeResult.distance / 1000).toFixed(1)} km (~${Math.max(1, Math.round(routeResult.duration / 60))} min).`,
+        )
+      } else {
+        setRouteFailed(true)
+        setGoMessage(routeResult.message || 'Não foi possível traçar a rota.')
+      }
+    } catch (err) {
+      console.warn('Erro ao traçar rota automática:', err)
+      setRouteFailed(true)
+      setGoMessage('Não foi possível calcular a rota.')
+    }
+  }
 
   async function centerOnMe() {
     setBusy(true)
@@ -223,9 +277,9 @@ export function HomePage() {
     if (!selected) return
     const place = [selected.title, number].filter(Boolean).join(', ')
 
-    if (!selected.verified || selected.latitude === null || selected.longitude === null) {
+    if (selected.latitude === null || selected.longitude === null) {
       setRouteFailed(true)
-      setGoMessage('Esta via ainda não possui geometria verificada no Multivus Maps.')
+      setGoMessage('Esta via ainda não possui coordenadas no mapa.')
       return
     }
 
@@ -394,6 +448,16 @@ export function HomePage() {
         routeLine={activeRoute?.geometry}
         points={points}
         userLocation={location}
+        radiusArea={
+          selected?.latitude && selected?.longitude && selected?.probableRadiusMeters
+            ? {
+                longitude: selected.longitude,
+                latitude: selected.latitude,
+                radiusMeters: selected.probableRadiusMeters,
+                label: selected.spatialRelationLabel ?? undefined,
+              }
+            : null
+        }
         onClick={correctionOpen ? (point) => setPin(point) : undefined}
       />
 
@@ -448,8 +512,13 @@ export function HomePage() {
               source={selected.source}
               sourceDate={selected.sourceDate}
               verified={selected.verified}
-              hasGeometry={Boolean(selected.verified && selected.latitude !== null && selected.longitude !== null)}
+              hasGeometry={Boolean(selected.latitude !== null && selected.longitude !== null)}
               streetNumber={number}
+              probableRadiusMeters={selected.probableRadiusMeters}
+              spatialRelationLabel={selected.spatialRelationLabel}
+              landmarkName={selected.landmarkName}
+              importanceScore={selected.importanceScore}
+              category={selected.category}
               onStreetNumber={(value) => useUi.getState().setNumber(value)}
               onClose={() => {
                 useUi.getState().setSelected(null)

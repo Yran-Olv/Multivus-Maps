@@ -330,7 +330,9 @@ export const landmarks = pgTable('landmarks', {
   longitude: doublePrecision('longitude'),
   geometry: point('geometry'),
   verified: boolean('verified').notNull().default(false),
+  importanceScore: integer('importance_score').notNull().default(70),
   confidenceScore: integer('confidence_score').notNull().default(70),
+  source: text('source').notNull().default('manual'),
   active: boolean('active').notNull().default(true),
   ...timestamps,
 })

@@ -3,12 +3,21 @@ import referenceSeed from '@data/santa-juliana/local-references.seed.json'
 import neighborhoodSeed from '@data/santa-juliana/neighborhoods.seed.json'
 import placeSeed from '@data/santa-juliana/places.seed.json'
 import streetSeed from '@data/santa-juliana/streets.seed.json'
+import reportData from '@data/import/reports/santa-juliana.json'
 import { normalizeAddress } from '@multivus/map-core'
 import type { LocalLandmark, LocalNeighborhood, LocalPlace, LocalReference, LocalStreet } from '@multivus/offline'
 import { api } from './api'
 import { db } from './db'
 
-const SEED_VERSION = 'santa-juliana-2026-10-v2'
+const SEED_VERSION = 'santa-juliana-2026-10-v4'
+
+const osmGeometries = new Map<string, unknown>()
+for (const item of (reportData as { items?: Array<{ multivus_name?: string; source_name?: string; geometry?: unknown }> }).items ?? []) {
+  if (item.geometry) {
+    if (item.multivus_name) osmGeometries.set(normalizeAddress(item.multivus_name), item.geometry)
+    if (item.source_name) osmGeometries.set(normalizeAddress(item.source_name), item.geometry)
+  }
+}
 
 export async function ensureSeed(): Promise<void> {
   const current = await db.kv.get('seedVersion')
@@ -23,17 +32,27 @@ export async function ensureSeed(): Promise<void> {
     await db.localReferences.clear()
     await db.neighborhoods.clear()
     await db.streets.bulkAdd(
-      streetSeed.streets.map((street) => ({
-        id: `seed:${normalizeAddress(street.officialName)}`,
-        officialName: street.officialName,
-        streetType: street.streetType,
-        neighborhoodName: null,
-        verified: false,
-        source: street.source,
-        sourceDate: street.sourceDate,
-        geometry: null,
-        aliases: street.aliases,
-      })),
+      streetSeed.streets.map((street) => {
+        const normName = normalizeAddress(street.officialName)
+        let geom: unknown = osmGeometries.get(normName) ?? null
+        if (!geom && street.aliases) {
+          for (const a of street.aliases) {
+            geom = osmGeometries.get(normalizeAddress(a.alias)) ?? null
+            if (geom) break
+          }
+        }
+        return {
+          id: `seed:${normName}`,
+          officialName: street.officialName,
+          streetType: street.streetType,
+          neighborhoodName: null,
+          verified: Boolean(geom),
+          source: geom ? 'OpenStreetMap' : street.source,
+          sourceDate: street.sourceDate,
+          geometry: geom,
+          aliases: street.aliases,
+        }
+      }),
     )
     await db.neighborhoods.bulkAdd(
       neighborhoodSeed.neighborhoods.map((neighborhood) => ({
