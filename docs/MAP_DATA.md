@@ -65,6 +65,12 @@ A geometria das vias é importada a partir de extrações reais do OpenStreetMap
 6. **Inspeção Humana:** Painel de Conferência Cartográfica em `/admin/mapa`.
 7. **Aprovação:** A revisão cartográfica pode confirmar a geometria da via, não o nome, o número predial ou a entrada de um imóvel. Trechos aprovados são acumulados na geometria da rua, mantendo segmentos e fontes individuais; sentidos permanecem pendentes até verificação local. A confiança do nome não deve ser elevada apenas pela aprovação da geometria.
 
+### Edição manual por administradores e editores
+
+Em `/admin/mapa`, a aba **Desenho Manual** permite criar uma rua ou selecionar uma existente, informar o nome oficial, tipo, bairro, nome antigo e desenhar o traçado tocando em sequência no mapa. A aba **Bairros** permite cadastrar/renomear bairros e desenhar ou substituir o contorno com pelo menos três pontos. Os limites desenhados manualmente ficam registrados com a fonte `Conferência local`; não devem ser apresentados como limites oficiais sem uma fonte oficial.
+
+Atribuir um bairro à rua pela edição manual marca essa associação como confirmada pela conferência administrativa. Isso não confirma o endereço predial nem altera a confiança do nome. Alterações e criações são registradas no histórico administrativo; somente perfis com permissão de escrita cartográfica podem salvá-las.
+
 Consulte [`IMPORT_OSM.md`](./IMPORT_OSM.md) para comandos e opções. Dados derivados do OSM precisam manter a atribuição e cumprir a ODbL.
 
 ---

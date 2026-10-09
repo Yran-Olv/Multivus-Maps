@@ -54,11 +54,31 @@ export const updateStreetSchema = createStreetSchema.partial().extend({
   active: z.boolean().optional(),
 })
 
+const geoPositionSchema = z.tuple([
+  z.number().gte(-180).lte(180),
+  z.number().gte(-90).lte(90),
+])
+const geoLinearRingSchema = z.array(geoPositionSchema).min(4).refine(
+  (ring) => {
+    const first = ring[0]
+    const last = ring[ring.length - 1]
+    return first?.[0] === last?.[0] && first?.[1] === last?.[1]
+  },
+  'O anel do polígono precisa começar e terminar no mesmo ponto.',
+)
+const polygonGeometrySchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('Polygon'), coordinates: z.array(geoLinearRingSchema).min(1) }),
+  z.object({ type: z.literal('MultiPolygon'), coordinates: z.array(z.array(geoLinearRingSchema).min(1)).min(1) }),
+])
+
 export const createNeighborhoodSchema = z.object({
   name: z.string().min(1).max(160),
   source: z.string().min(1).max(200).optional(),
   sourceDate: z.string().regex(/^\d{4}-\d{2}(-\d{2})?$/).nullable().optional(),
+  geometry: polygonGeometrySchema.nullable().optional(),
 })
+
+export const updateNeighborhoodSchema = createNeighborhoodSchema.partial()
 
 export const createPlaceSchema = z.object({
   name: z.string().min(1).max(200),

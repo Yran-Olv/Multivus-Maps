@@ -153,7 +153,7 @@ export function AdminMapPage() {
   // Camadas
   const [showMultivus, setShowMultivus] = useState(true)
   const [showOsm, setShowOsm] = useState(true)
-  const [activeTab, setActiveTab] = useState<'osm' | 'streets' | 'direction' | 'manual'>('osm')
+  const [activeTab, setActiveTab] = useState<'osm' | 'streets' | 'direction' | 'manual' | 'neighborhoods'>('osm')
 
   // Dados do backend
   const streets = useQuery({
@@ -173,7 +173,8 @@ export function AdminMapPage() {
   })
   const neighborhoods = useQuery({
     queryKey: ['neighborhoods'],
-    queryFn: () => api<{ neighborhoods: Array<{ id: string; name: string }> }>('/api/v1/neighborhoods'),
+    enabled: !!user && can(user.role, 'neighborhood:write'),
+    queryFn: () => api<{ neighborhoods: EditableNeighborhood[] }>('/api/v1/neighborhoods'),
   })
 
   // Seleção e filtros
@@ -233,6 +234,9 @@ export function AdminMapPage() {
   const [manualAlias, setManualAlias] = useState('')
   const [manualVerified, setManualVerified] = useState(false)
   const [points, setPoints] = useState<Array<{ longitude: number; latitude: number }>>([])
+  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState('')
+  const [neighborhoodName, setNeighborhoodName] = useState('')
+  const [neighborhoodPoints, setNeighborhoodPoints] = useState<Array<{ longitude: number; latitude: number }>>([])
 
   const selectedOsm = (osmRecords.data?.records ?? []).find((r) => r.id === selectedOsmId)
   const selectedStreet = (streets.data?.streets ?? []).find(
@@ -241,7 +245,7 @@ export function AdminMapPage() {
 
   // Map lines
   const lines = useMemo(() => {
-    return (streets.data?.streets ?? [])
+    const streetLines = (streets.data?.streets ?? [])
       .map((s) => {
         const line = lineOf(s.id, s.geometry)
         if (!line) return null
@@ -254,7 +258,37 @@ export function AdminMapPage() {
         }
       })
       .filter((l): l is NonNullable<typeof l> => l !== null)
-  }, [streets.data?.streets, selectedStreet?.id])
+    const neighborhoodLines = (neighborhoods.data?.neighborhoods ?? []).flatMap((neighborhood) =>
+      boundaryLines(neighborhood.id, neighborhood.geometry).map((line) => ({
+        ...line,
+        color: neighborhood.id === selectedNeighborhoodId ? '#38bdf8' : '#fb923c',
+        name: `Bairro: ${neighborhood.name}`,
+      })),
+    )
+    const draftLine = draftBoundaryLine(neighborhoodPoints)
+    const streetDraftLine = activeTab === 'manual' && points.length >= 2
+      ? {
+          id: 'draft-street-track',
+          coordinates: points.map(({ longitude, latitude }) => [longitude, latitude] as [number, number]),
+          color: '#38bdf8',
+          name: 'Novo traçado da rua',
+        }
+      : null
+    return [
+      ...streetLines,
+      ...neighborhoodLines,
+      ...(streetDraftLine ? [streetDraftLine] : []),
+      ...(draftLine ? [{ ...draftLine, color: '#f0b429', name: 'Novo limite do bairro' }] : []),
+    ]
+  }, [
+    streets.data?.streets,
+    neighborhoods.data?.neighborhoods,
+    selectedStreet?.id,
+    selectedNeighborhoodId,
+    neighborhoodPoints,
+    activeTab,
+    points,
+  ])
 
   const osmLines = useMemo(() => {
     return (osmRecords.data?.records ?? [])
@@ -314,8 +348,23 @@ export function AdminMapPage() {
 
   function selectStreetDirectly(street: EditableStreet) {
     setSelectedStreetId(street.id)
+    setManualOfficialName(street.officialName)
+    setManualStreetType((street.streetType as StreetType) ?? 'RUA')
+    setManualNeighborhoodId(street.neighborhoodId ?? '')
+    setManualVerified(street.verified)
+    setManualAlias('')
+    setPoints([])
     const line = lineOf(street.id, street.geometry)
     if (line) mapRef.current?.fitBounds(line.coordinates)
+    setMessage(null)
+  }
+
+  function selectNeighborhood(neighborhood: EditableNeighborhood) {
+    setSelectedNeighborhoodId(neighborhood.id)
+    setNeighborhoodName(neighborhood.name)
+    setNeighborhoodPoints(polygonOuterRing(neighborhood.geometry) ?? [])
+    const boundary = boundaryLines(neighborhood.id, neighborhood.geometry)[0]
+    if (boundary) mapRef.current?.fitBounds(boundary.coordinates)
     setMessage(null)
   }
 
@@ -467,7 +516,7 @@ export function AdminMapPage() {
 
   // Sentido de circulação e conversões
   async function handleSaveDirection() {
-    if (!selectedStreet?.id) {
+    if (!selectedStreet?.id || !selectedStreet.geometry) {
       setMessage('Selecione uma rua com geometria primeiro.')
       return
     }
@@ -478,6 +527,7 @@ export function AdminMapPage() {
         body: JSON.stringify({
           streetId: selectedStreet.id,
           direction: segmentDirection,
+          geometry: selectedStreet.geometry,
         }),
       })
       setMessage(`Sentido de circulação (${segmentDirection}) registrado e verificado!`)
@@ -495,45 +545,110 @@ export function AdminMapPage() {
     const geometry = points.length >= 2
       ? { type: 'LineString', coordinates: points.map((point) => [point.longitude, point.latitude]) }
       : undefined
-
-    if (selectedStreetId) {
-      await api(`/api/v1/streets/${selectedStreetId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          officialName: manualOfficialName || undefined,
-          streetType: manualStreetType,
-          neighborhoodId: manualNeighborhoodId || null,
-          verified: manualVerified,
-          ...(geometry ? { geometry } : {}),
-        }),
-      })
-      if (manualAlias.trim()) {
-        await api('/api/v1/street-aliases', {
-          method: 'POST',
-          body: JSON.stringify({ streetId: selectedStreetId, alias: manualAlias.trim(), aliasType: 'OLD_NAME' }),
-        })
-      }
-      setMessage('Rua atualizada. O histórico foi preservado com audit_log.')
-    } else {
-      await api('/api/v1/streets', {
-        method: 'POST',
-        body: JSON.stringify({
-          officialName: manualOfficialName,
-          streetType: manualStreetType,
-          neighborhoodId: manualNeighborhoodId || null,
-          source: 'Conferência local',
-          sourceDate: new Date().toISOString().slice(0, 10),
-          geometry: geometry ?? null,
-          aliases: manualAlias.trim() ? [{ alias: manualAlias.trim(), aliasType: 'OLD_NAME' }] : [],
-        }),
-      })
-      setMessage('Rua criada com sucesso!')
+    if (!manualOfficialName.trim()) {
+      setMessage('Informe o nome oficial da rua.')
+      return
     }
-    setPoints([])
-    await Promise.all([
-      client.invalidateQueries({ queryKey: ['admin-streets'] }),
-      client.invalidateQueries({ queryKey: ['admin-stats'] }),
-    ])
+    setBusy(true)
+    try {
+      if (selectedStreetId) {
+        await api(`/api/v1/streets/${selectedStreetId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            officialName: manualOfficialName.trim(),
+            streetType: manualStreetType,
+            neighborhoodId: manualNeighborhoodId || null,
+            verified: manualVerified,
+            ...(geometry ? { geometry } : {}),
+          }),
+        })
+        if (manualAlias.trim()) {
+          await api('/api/v1/street-aliases', {
+            method: 'POST',
+            body: JSON.stringify({ streetId: selectedStreetId, alias: manualAlias.trim(), aliasType: 'OLD_NAME' }),
+          })
+        }
+        setMessage('Rua atualizada. O histórico foi preservado com audit_log.')
+      } else {
+        await api('/api/v1/streets', {
+          method: 'POST',
+          body: JSON.stringify({
+            officialName: manualOfficialName.trim(),
+            streetType: manualStreetType,
+            neighborhoodId: manualNeighborhoodId || null,
+            source: 'Conferência local',
+            sourceDate: new Date().toISOString().slice(0, 10),
+            geometry: geometry ?? null,
+            aliases: manualAlias.trim() ? [{ alias: manualAlias.trim(), aliasType: 'OLD_NAME' }] : [],
+          }),
+        })
+        setMessage('Rua criada com sucesso!')
+      }
+      setPoints([])
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['admin-streets'] }),
+        client.invalidateQueries({ queryKey: ['admin-stats'] }),
+        client.invalidateQueries({ queryKey: ['neighborhoods'] }),
+      ])
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a rua.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleSaveNeighborhood() {
+    setMessage(null)
+    if (!neighborhoodName.trim()) {
+      setMessage('Informe o nome do bairro.')
+      return
+    }
+    if (neighborhoodPoints.length < 3) {
+      setMessage('Marque pelo menos 3 pontos no mapa para desenhar o limite do bairro.')
+      return
+    }
+    const ring = neighborhoodPoints.map(({ longitude, latitude }) => [longitude, latitude])
+    const first = ring[0]
+    const last = ring[ring.length - 1]
+    if (first && last && (first[0] !== last[0] || first[1] !== last[1])) ring.push([...first])
+    const geometry = { type: 'Polygon', coordinates: [ring] }
+    setBusy(true)
+    try {
+      if (selectedNeighborhoodId) {
+        await api(`/api/v1/neighborhoods/${selectedNeighborhoodId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            name: neighborhoodName.trim(),
+            source: 'Conferência local',
+            sourceDate: new Date().toISOString().slice(0, 10),
+            geometry,
+          }),
+        })
+        setMessage(`Bairro "${neighborhoodName.trim()}" e seu limite foram atualizados.`)
+      } else {
+        const response = await api<{ neighborhood: { id: string } }>('/api/v1/neighborhoods', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: neighborhoodName.trim(),
+            source: 'Conferência local',
+            sourceDate: new Date().toISOString().slice(0, 10),
+            geometry,
+          }),
+        })
+        setSelectedNeighborhoodId(response.neighborhood.id)
+        setMessage(`Bairro "${neighborhoodName.trim()}" e seu limite foram cadastrados.`)
+      }
+      setNeighborhoodPoints([])
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['neighborhoods'] }),
+        client.invalidateQueries({ queryKey: ['admin-streets'] }),
+        client.invalidateQueries({ queryKey: ['admin-stats'] }),
+      ])
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível salvar o bairro.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (!user) return <Navigate to="/entrar" replace />
@@ -623,8 +738,16 @@ export function AdminMapPage() {
           osmLines={osmLines}
           showMultivus={showMultivus}
           showOsm={showOsm}
-          points={points.map((point, index) => ({ id: String(index), ...point, color: '#f0b429' }))}
-          onClick={activeTab === 'manual' ? (point) => setPoints((current) => [...current, point]) : undefined}
+          points={(activeTab === 'neighborhoods' ? neighborhoodPoints : points).map((point, index) => ({
+            id: String(index),
+            ...point,
+            color: '#f0b429',
+          }))}
+          onClick={activeTab === 'manual'
+            ? (point) => setPoints((current) => [...current, point])
+            : activeTab === 'neighborhoods'
+              ? (point) => setNeighborhoodPoints((current) => [...current, point])
+              : undefined}
         />
         {/* Legenda Flutuante */}
         <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-col gap-1 rounded-xl bg-slate-900/90 p-2 text-[11px] shadow-lg backdrop-blur">
@@ -646,11 +769,11 @@ export function AdminMapPage() {
       {/* Painel Inferior de Conferência */}
       <div className="flex flex-col overflow-hidden bg-[#12181f] border-t border-white/10">
         {/* Navegação por Abas */}
-        <div className="flex border-b border-white/10 bg-[#161e27] px-3">
+        <div className="flex overflow-x-auto border-b border-white/10 bg-[#161e27] px-3">
           <button
             type="button"
             onClick={() => setActiveTab('osm')}
-            className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition border-b-2 ${
+            className={`shrink-0 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition border-b-2 ${
               activeTab === 'osm'
                 ? 'border-purple-400 text-purple-300 bg-white/5'
                 : 'border-transparent text-slate-400 hover:text-white'
@@ -661,7 +784,7 @@ export function AdminMapPage() {
           <button
             type="button"
             onClick={() => setActiveTab('streets')}
-            className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition border-b-2 ${
+            className={`shrink-0 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition border-b-2 ${
               activeTab === 'streets'
                 ? 'border-amber-400 text-amber-300 bg-white/5'
                 : 'border-transparent text-slate-400 hover:text-white'
@@ -672,7 +795,7 @@ export function AdminMapPage() {
           <button
             type="button"
             onClick={() => setActiveTab('direction')}
-            className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition border-b-2 ${
+            className={`shrink-0 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition border-b-2 ${
               activeTab === 'direction'
                 ? 'border-teal-400 text-teal-300 bg-white/5'
                 : 'border-transparent text-slate-400 hover:text-white'
@@ -683,13 +806,24 @@ export function AdminMapPage() {
           <button
             type="button"
             onClick={() => setActiveTab('manual')}
-            className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition border-b-2 ${
+            className={`shrink-0 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition border-b-2 ${
               activeTab === 'manual'
                 ? 'border-sky-400 text-sky-300 bg-white/5'
                 : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
             Desenho Manual
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('neighborhoods')}
+            className={`shrink-0 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition border-b-2 ${
+              activeTab === 'neighborhoods'
+                ? 'border-orange-400 text-orange-300 bg-white/5'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            Bairros ({neighborhoods.data?.neighborhoods.length ?? 0})
           </button>
         </div>
 
@@ -1067,7 +1201,7 @@ export function AdminMapPage() {
                 </div>
                 <button
                   type="button"
-                  disabled={busy || !selectedStreet?.id}
+                  disabled={busy || !selectedStreet?.id || !selectedStreet.geometry}
                   onClick={() => void handleSaveDirection()}
                   className="w-full h-11 rounded-xl bg-[#f0b429] font-bold text-slate-900 hover:brightness-105 transition text-xs"
                 >
@@ -1099,6 +1233,9 @@ export function AdminMapPage() {
           {/* ABA 4: DESENHO MANUAL */}
           {activeTab === 'manual' && (
             <div className="max-w-xl mx-auto space-y-3">
+              <p className="text-xs text-slate-400">
+                Para traçar uma rua, toque no mapa em sequência ao longo do percurso. O traçado é salvo como geometria da via; não representa número de residência.
+              </p>
               <label className="block text-xs text-slate-300">
                 Selecionar via existente para redesenhar:
                 <select
@@ -1110,6 +1247,7 @@ export function AdminMapPage() {
                     setManualStreetType((s?.streetType as StreetType) ?? 'RUA')
                     setManualNeighborhoodId(s?.neighborhoodId ?? '')
                     setManualVerified(s?.verified ?? false)
+                    setManualAlias('')
                     setPoints([])
                   }}
                   className="mt-1 h-11 w-full rounded-xl bg-[#1c242c] px-3 text-xs"
@@ -1164,7 +1302,7 @@ export function AdminMapPage() {
                   onChange={(e) => setManualVerified(e.target.checked)}
                   className="accent-amber-400"
                 />
-                Marcar como verificada em campo (confiança 100)
+                Marcar o nome como verificado em campo (confiança 100)
               </label>
 
               <p className="text-xs text-slate-400">
@@ -1183,12 +1321,106 @@ export function AdminMapPage() {
                 </button>
                 <button
                   type="button"
+                  disabled={busy}
                   className="h-11 rounded-xl bg-[#f0b429] font-bold text-slate-900 text-xs hover:brightness-105 transition"
-                  onClick={() => void handleSaveManual().catch((err: Error) => setMessage(err.message))}
+                  onClick={() => void handleSaveManual()}
                 >
-                  Salvar Via Manual
+                  {busy ? 'Salvando...' : 'Salvar Rua'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'neighborhoods' && (
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="font-semibold">Bairros cadastrados</h2>
+                    <p className="text-xs text-slate-400">Selecione para editar ou comece um novo cadastro.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedNeighborhoodId('')
+                      setNeighborhoodName('')
+                      setNeighborhoodPoints([])
+                      setMessage(null)
+                    }}
+                    className="h-10 shrink-0 rounded-xl bg-orange-500 px-3 text-xs font-bold text-slate-950"
+                  >
+                    + Novo bairro
+                  </button>
+                </div>
+                {neighborhoods.isError ? (
+                  <p className="rounded-xl bg-red-950/40 p-3 text-xs text-red-200">Não foi possível carregar os bairros. Verifique sua conexão e tente novamente.</p>
+                ) : null}
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                  {(neighborhoods.data?.neighborhoods ?? []).map((neighborhood) => (
+                    <button
+                      key={neighborhood.id}
+                      type="button"
+                      onClick={() => selectNeighborhood(neighborhood)}
+                      className={`rounded-xl border p-3 text-left ${
+                        neighborhood.id === selectedNeighborhoodId
+                          ? 'border-orange-400 bg-orange-950/30'
+                          : 'border-white/5 bg-[#1c242c] hover:bg-[#25303b]'
+                      }`}
+                    >
+                      <span className="block font-semibold">{neighborhood.name}</span>
+                      <span className="mt-1 block text-xs text-slate-400">
+                        {neighborhood.hasGeometry ? 'Limite desenhado' : 'Sem limite cadastrado'}
+                        {neighborhood.source ? ` · Fonte: ${neighborhood.source}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                  {neighborhoods.data?.neighborhoods.length === 0 ? (
+                    <p className="rounded-xl bg-[#1c242c] p-4 text-sm text-slate-400">Nenhum bairro cadastrado.</p>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="space-y-3 rounded-2xl border border-white/5 bg-[#1c242c] p-4">
+                <div>
+                  <h2 className="font-semibold">{selectedNeighborhoodId ? 'Editar bairro' : 'Cadastrar bairro'}</h2>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Informe o nome e toque no mapa para marcar pelo menos 3 pontos contornando o bairro. O último ponto será ligado ao primeiro.
+                    Desenhos manuais ficam identificados como conferência local, não como limite oficial.
+                  </p>
+                </div>
+                <label className="block text-xs text-slate-300">
+                  Nome do bairro
+                  <input
+                    value={neighborhoodName}
+                    onChange={(event) => setNeighborhoodName(event.target.value)}
+                    placeholder="Ex.: Centro"
+                    maxLength={160}
+                    className="mt-1 h-11 w-full rounded-xl bg-[#111820] px-3 text-sm text-white outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </label>
+                <p className="text-xs text-orange-200">
+                  {neighborhoodPoints.length
+                    ? `${neighborhoodPoints.length} ponto(s) marcados. Clique no mapa para continuar o contorno.`
+                    : 'Nenhum ponto marcado. Amplie o mapa e comece a contornar o bairro.'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNeighborhoodPoints([])}
+                    className="h-11 rounded-xl bg-white/10 text-xs font-semibold hover:bg-white/20"
+                  >
+                    Limpar contorno
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || neighborhoodPoints.length < 3 || !neighborhoodName.trim()}
+                    onClick={() => void handleSaveNeighborhood()}
+                    className="h-11 rounded-xl bg-orange-400 text-xs font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busy ? 'Salvando...' : 'Salvar bairro e limite'}
+                  </button>
+                </div>
+              </section>
             </div>
           )}
         </div>
@@ -1267,6 +1499,69 @@ type EditableStreet = {
   sourceDate?: string | null
   geometry: unknown
   aliases?: Array<{ id: string; alias: string; aliasType: string; active?: boolean }>
+}
+
+type EditableNeighborhood = {
+  id: string
+  name: string
+  source: string | null
+  sourceDate: string | null
+  hasGeometry: boolean
+  geometry: unknown
+}
+
+function polygonOuterRing(geometry: unknown): Array<{ longitude: number; latitude: number }> | null {
+  if (!geometry || typeof geometry !== 'object' || !('type' in geometry) || !('coordinates' in geometry)) return null
+  const shape = geometry as { type: unknown; coordinates: unknown }
+  const polygons = shape.type === 'Polygon'
+    ? [shape.coordinates]
+    : shape.type === 'MultiPolygon' && Array.isArray(shape.coordinates)
+      ? shape.coordinates
+      : []
+  const polygon = polygons[0]
+  const ring = Array.isArray(polygon) ? polygon[0] : null
+  if (!Array.isArray(ring)) return null
+  const result = ring.flatMap((position) => {
+    if (!Array.isArray(position) || typeof position[0] !== 'number' || typeof position[1] !== 'number') return []
+    if (!Number.isFinite(position[0]) || !Number.isFinite(position[1])) return []
+    return [{ longitude: position[0], latitude: position[1] }]
+  })
+  if (result.length > 1) {
+    const first = result[0]
+    const last = result[result.length - 1]
+    if (first?.longitude === last?.longitude && first.latitude === last.latitude) result.pop()
+  }
+  return result.length >= 3 ? result : null
+}
+
+function boundaryLines(id: string, geometry: unknown): Array<{ id: string; coordinates: [number, number][] }> {
+  if (!geometry || typeof geometry !== 'object' || !('type' in geometry) || !('coordinates' in geometry)) return []
+  const shape = geometry as { type: unknown; coordinates: unknown }
+  const polygons = shape.type === 'Polygon'
+    ? [shape.coordinates]
+    : shape.type === 'MultiPolygon' && Array.isArray(shape.coordinates)
+      ? shape.coordinates
+      : []
+  return polygons.flatMap((polygon, polygonIndex) => {
+    if (!Array.isArray(polygon) || !Array.isArray(polygon[0])) return []
+    const coordinates = polygon[0].flatMap((position): [number, number][] => {
+      if (!Array.isArray(position) || typeof position[0] !== 'number' || typeof position[1] !== 'number') return []
+      if (!Number.isFinite(position[0]) || !Number.isFinite(position[1])) return []
+      return [[position[0], position[1]]]
+    })
+    return coordinates.length >= 4 ? [{ id: `${id}-${polygonIndex}`, coordinates }] : []
+  })
+}
+
+function draftBoundaryLine(points: Array<{ longitude: number; latitude: number }>) {
+  if (points.length < 2) return null
+  const coordinates = points.map(({ longitude, latitude }) => [longitude, latitude] as [number, number])
+  const first = coordinates[0]
+  const last = coordinates[coordinates.length - 1]
+  if (points.length >= 3 && first && last) {
+    if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push([...first])
+  }
+  return { id: 'draft-neighborhood-boundary', coordinates }
 }
 
 type OsmRecord = {

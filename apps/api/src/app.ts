@@ -29,6 +29,7 @@ import {
   searchQuerySchema,
   syncBatchSchema,
   updateStreetSchema,
+  updateNeighborhoodSchema,
 } from '@multivus/shared'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
@@ -81,6 +82,7 @@ import {
   searchCatalog,
   storeRefresh,
   updateStreet,
+  updateNeighborhood,
 } from './domain'
 
 import { verifyPassword } from './lib/passwords'
@@ -379,6 +381,13 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
     const body = createNeighborhoodSchema.parse(request.body)
     const neighborhood = await createNeighborhood(app.db, body, request.authUser!.id)
     return reply.code(201).send({ neighborhood })
+  })
+  app.patch('/api/v1/neighborhoods/:id', { preHandler: requireAction('neighborhood:write') }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const body = updateNeighborhoodSchema.parse(request.body)
+    const neighborhood = await updateNeighborhood(app.db, id, body, request.authUser!.id)
+    if (!neighborhood) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Bairro não encontrado' } })
+    return { neighborhood }
   })
   app.post('/api/v1/places', { preHandler: requireAction('place:write') }, async (request, reply) => {
     const body = createPlaceSchema.parse(request.body)

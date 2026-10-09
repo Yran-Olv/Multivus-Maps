@@ -1,6 +1,6 @@
-export const APP_VERSION = '1.4.0'
+export const APP_VERSION = '1.5.0'
 export const APP_BUILD_DATE = '2026-10-09'
-export const APP_BUILD_ID = '20261009.3'
+export const APP_BUILD_ID = '20261009.4'
 
 export const ROLES = ['ADMIN', 'EDITOR', 'DELIVERY_DRIVER', 'USER'] as const
 export type Role = (typeof ROLES)[number]

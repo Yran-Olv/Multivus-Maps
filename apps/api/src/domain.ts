@@ -99,6 +99,7 @@ export async function listNeighborhoods(db: Database) {
       sourceDate: neighborhoods.sourceDate,
       active: neighborhoods.active,
       hasGeometry: sql<boolean>`${neighborhoods.geometry} IS NOT NULL`,
+      geometry: sql<unknown>`ST_AsGeoJSON(${neighborhoods.geometry})::json`,
     })
     .from(neighborhoods)
     .where(eq(neighborhoods.active, true))
@@ -828,10 +829,14 @@ export async function createStreet(db: Database, input: CreateStreetInput, userI
   const geometry = input.geometry ? JSON.stringify(input.geometry) : null
   const result = await db.execute<{ id: string }>(sql`
     INSERT INTO streets (
-      city_id, neighborhood_id, official_name, normalized_name, street_type, geometry,
+      city_id, neighborhood_id, neighborhood_status, neighborhood_source,
+      official_name, normalized_name, street_type, geometry,
       source, source_date, verified, confidence_score, active, notes
     )
-    SELECT id, ${input.neighborhoodId ?? null}, ${input.officialName}, ${normalizeAddress(input.officialName)},
+    SELECT id, ${input.neighborhoodId ?? null},
+           CASE WHEN ${input.neighborhoodId ?? null}::uuid IS NULL THEN 'PENDING' ELSE 'CONFIRMED' END,
+           CASE WHEN ${input.neighborhoodId ?? null}::uuid IS NULL THEN NULL ELSE 'Conferência administrativa local' END,
+           ${input.officialName}, ${normalizeAddress(input.officialName)},
            ${input.streetType},
            CASE WHEN ${geometry}::text IS NULL THEN NULL ELSE ST_SetSRID(ST_GeomFromGeoJSON(${geometry}), 4326) END,
            ${input.source}, ${input.sourceDate ?? null}, false, 70, true, ${input.notes ?? null}
@@ -861,7 +866,20 @@ export async function updateStreet(db: Database, id: string, input: UpdateStreet
         ELSE ${input.officialName ? normalizeAddress(input.officialName) : null}
       END,
       street_type = COALESCE(${input.streetType ?? null}, street_type),
-      neighborhood_id = COALESCE(${input.neighborhoodId ?? null}, neighborhood_id),
+      neighborhood_id = CASE
+        WHEN ${input.neighborhoodId !== undefined}::boolean THEN ${input.neighborhoodId ?? null}
+        ELSE neighborhood_id
+      END,
+      neighborhood_status = CASE
+        WHEN ${input.neighborhoodId !== undefined}::boolean THEN
+          CASE WHEN ${input.neighborhoodId ?? null}::uuid IS NULL THEN 'PENDING' ELSE 'CONFIRMED' END
+        ELSE neighborhood_status
+      END,
+      neighborhood_source = CASE
+        WHEN ${input.neighborhoodId !== undefined}::boolean THEN
+          CASE WHEN ${input.neighborhoodId ?? null}::uuid IS NULL THEN NULL ELSE 'Conferência administrativa local' END
+        ELSE neighborhood_source
+      END,
       source = COALESCE(${input.source ?? null}, source),
       source_date = COALESCE(${input.sourceDate ?? null}, source_date),
       notes = COALESCE(${input.notes ?? null}, notes),
@@ -1351,21 +1369,98 @@ export async function createAddressPoint(
 
 export async function createNeighborhood(
   db: Database,
-  input: { name: string; source?: string; sourceDate?: string | null },
+  input: { name: string; source?: string; sourceDate?: string | null; geometry?: unknown | null },
   userId: string,
 ) {
   const city = await db.select({ id: cities.id }).from(cities).limit(1)
   const cityId = city[0]?.id
   if (!cityId) throw new Error('Cidade não cadastrada')
-  const [created] = await db.insert(neighborhoods).values({
-    cityId,
-    name: input.name,
-    normalizedName: normalizeAddress(input.name),
-    source: input.source ?? 'Conferência local',
-    sourceDate: input.sourceDate ?? null,
-  }).returning()
+  const geometry = input.geometry ? JSON.stringify(input.geometry) : null
+  const result = await db.execute<{ id: string; name: string }>(sql`
+    WITH incoming AS (
+      SELECT CASE
+        WHEN ${geometry}::text IS NULL THEN NULL
+        ELSE ST_SetSRID(ST_GeomFromGeoJSON(${geometry}), 4326)
+      END AS geom
+    )
+    INSERT INTO neighborhoods (city_id, name, normalized_name, geometry, source, source_date)
+    SELECT ${cityId}, ${input.name}, ${normalizeAddress(input.name)}, incoming.geom,
+           ${input.source ?? 'Conferência local'}, ${input.sourceDate ?? null}
+    FROM incoming
+    WHERE incoming.geom IS NULL OR (
+      GeometryType(incoming.geom) IN ('POLYGON', 'MULTIPOLYGON')
+      AND ST_IsValid(incoming.geom)
+    )
+    RETURNING id, name
+  `)
+  const created = rowsOf(result)[0]
+  if (!created) throw new Error('O limite precisa ser um polígono válido.')
   await audit(db, { entityType: 'neighborhood', entityId: created?.id ?? input.name, action: 'create', newData: input, userId })
   return created
+}
+
+export async function updateNeighborhood(
+  db: Database,
+  id: string,
+  input: { name?: string; source?: string; sourceDate?: string | null; geometry?: unknown | null },
+  userId: string,
+) {
+  const [previous] = await db.select({
+    id: neighborhoods.id,
+    name: neighborhoods.name,
+    source: neighborhoods.source,
+    sourceDate: neighborhoods.sourceDate,
+    hasGeometry: sql<boolean>`${neighborhoods.geometry} IS NOT NULL`,
+  }).from(neighborhoods).where(eq(neighborhoods.id, id)).limit(1)
+  if (!previous) return null
+
+  const geometry = input.geometry === undefined ? undefined : input.geometry ? JSON.stringify(input.geometry) : null
+  const result = await db.execute<{ id: string; name: string }>(sql`
+    WITH incoming AS (
+      SELECT CASE
+        WHEN ${geometry ?? null}::text IS NULL THEN NULL
+        ELSE ST_SetSRID(ST_GeomFromGeoJSON(${geometry ?? null}), 4326)
+      END AS geom
+    )
+    UPDATE neighborhoods
+    SET name = COALESCE(${input.name ?? null}, neighborhoods.name),
+        normalized_name = CASE
+          WHEN ${input.name ?? null}::text IS NULL THEN neighborhoods.normalized_name
+          ELSE ${input.name ? normalizeAddress(input.name) : null}
+        END,
+        source = COALESCE(${input.source ?? null}, neighborhoods.source),
+        source_date = CASE
+          WHEN ${input.sourceDate !== undefined}::boolean THEN ${input.sourceDate ?? null}
+          ELSE neighborhoods.source_date
+        END,
+        geometry = CASE
+          WHEN ${geometry === undefined}::boolean THEN neighborhoods.geometry
+          ELSE incoming.geom
+        END,
+        updated_at = now()
+    FROM incoming
+    WHERE neighborhoods.id = ${id}
+      AND (
+        ${geometry === undefined}::boolean
+        OR incoming.geom IS NULL
+        OR (
+          GeometryType(incoming.geom) IN ('POLYGON', 'MULTIPOLYGON')
+          AND ST_IsValid(incoming.geom)
+        )
+      )
+    RETURNING neighborhoods.id, neighborhoods.name
+  `)
+  const updated = rowsOf(result)[0]
+  if (!updated) throw new Error('O limite precisa ser um polígono válido.')
+  await audit(db, {
+    entityType: 'neighborhood',
+    entityId: id,
+    action: 'update',
+    previousData: previous,
+    newData: { ...updated, ...input },
+    userId,
+  })
+  return updated
 }
 
 export async function createPlace(
