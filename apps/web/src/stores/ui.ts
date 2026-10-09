@@ -1,29 +1,7 @@
 import { create } from 'zustand'
+import type { SavedDestination } from '@multivus/shared'
 
-export type SelectedPlace = {
-  id: string
-  kind: 'street' | 'place' | 'landmark' | 'reference' | 'neighborhood'
-  title: string
-  neighborhoodName: string | null
-  oldNames: string[]
-  usedOldName: boolean
-  warning: string | null
-  confidence: number
-  customerInput: string | null
-  matchedAlias: string | null
-  reference: string | null
-  source: string | null
-  sourceDate: string | null
-  verified: boolean
-  latitude: number | null
-  longitude: number | null
-  targetStreetName?: string | null
-  landmarkName?: string | null
-  probableRadiusMeters?: number | null
-  spatialRelationLabel?: string | null
-  importanceScore?: number | null
-  category?: string | null
-}
+export type SelectedPlace = SavedDestination
 
 
 type UiState = {
@@ -35,6 +13,7 @@ type UiState = {
   notice: string | null
   correctionOpen: boolean
   updateAvailable: boolean
+  navigating: boolean
   setOnline: (online: boolean) => void
   setPending: (pending: number) => void
   setLocation: (location: { latitude: number; longitude: number } | null) => void
@@ -43,6 +22,7 @@ type UiState = {
   setNotice: (notice: string | null) => void
   setCorrectionOpen: (open: boolean) => void
   setUpdateAvailable: (available: boolean) => void
+  setNavigating: (navigating: boolean) => void
 }
 
 export const useUi = create<UiState>((set) => ({
@@ -54,6 +34,7 @@ export const useUi = create<UiState>((set) => ({
   notice: null,
   correctionOpen: false,
   updateAvailable: false,
+  navigating: false,
   setOnline: (online) => set({ online }),
   setPending: (pending) => set({ pending }),
   setLocation: (location) => set({ location }),
@@ -62,4 +43,5 @@ export const useUi = create<UiState>((set) => ({
   setNotice: (notice) => set({ notice }),
   setCorrectionOpen: (correctionOpen) => set({ correctionOpen }),
   setUpdateAvailable: (updateAvailable) => set({ updateAvailable }),
+  setNavigating: (navigating) => set({ navigating }),
 }))

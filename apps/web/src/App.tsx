@@ -14,7 +14,8 @@ export function App() {
   const online = useUi((state) => state.online)
   const pending = useUi((state) => state.pending)
   const updateAvailable = useUi((state) => state.updateAvailable)
-  const hideNav = location.pathname === '/entrar' || location.pathname === '/busca' || location.pathname === '/entender' || location.pathname.startsWith('/admin')
+  const navigating = useUi((state) => state.navigating)
+  const hideNav = navigating || location.pathname === '/entrar' || location.pathname === '/busca' || location.pathname === '/entender' || location.pathname.startsWith('/admin')
 
   useEffect(() => {
     const stopUpdater = initPwaUpdater(() => {

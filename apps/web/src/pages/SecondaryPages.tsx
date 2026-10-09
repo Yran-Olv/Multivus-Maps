@@ -1,4 +1,4 @@
-import { enqueueOperation } from '@multivus/offline'
+import { enqueueOperation, type LocalFavorite, type LocalRecent } from '@multivus/offline'
 import { can } from '@multivus/shared'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
@@ -9,24 +9,161 @@ import { useSession } from '../lib/session'
 import { flushPending } from '../lib/sync'
 import { APP_VERSION, APP_BUILD_DATE, clearAppCacheAndReload } from '../lib/pwa-update'
 import { useUi } from '../stores/ui'
+import { restoreSavedAddress } from '../lib/saved-address'
+import { useCatalog } from '../hooks/use-catalog'
+import { toRecords } from './SearchPage'
 
 export function FavoritesPage() {
-  const [items, setItems] = useState<Array<{ id: string; label: string; customerInput?: string | null; matchedAlias?: string | null }>>([])
+  const navigate = useNavigate()
+  const catalog = useCatalog()
+  const [items, setItems] = useState<LocalFavorite[]>([])
   useEffect(() => {
     void db.favorites.orderBy('createdAt').reverse().toArray().then(setItems)
   }, [])
+
+  function selectFavorite(item: LocalFavorite) {
+    const restored = restoreSavedAddress(item, toRecords(catalog.data))
+    useUi.getState().setSelected(restored.destination, restored.number)
+    navigate('/')
+    if (restored.destination.latitude === null || restored.destination.longitude === null) {
+      useUi.getState().setNotice('Este destino ainda não tem coordenadas confirmadas. Você pode informar uma correção no mapa.')
+    }
+  }
+
   return (
     <Screen title="Favoritos">
       {items.length === 0 ? <p className="text-slate-400">Nenhum endereço salvo ainda.</p> : null}
       <ul className="grid gap-2">
-        {items.map((item) => (
-          <li key={item.id} className="rounded-2xl bg-[#1c242c] px-4 py-4">
-            <p className="text-lg">{item.label}</p>
-            {item.customerInput && item.matchedAlias ? (
-              <p className="mt-1 text-sm text-amber-200">Cliente falou: {item.customerInput}</p>
-            ) : null}
-          </li>
-        ))}
+        {items.map((item) => {
+          const dest = item.destination
+          const hasCoords = dest?.latitude !== null && dest?.longitude !== null
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                onClick={() => selectFavorite(item)}
+                className="w-full rounded-2xl bg-[#1c242c] px-4 py-4 text-left transition hover:bg-white/5 active:scale-[0.99]"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-lg font-medium text-white">{dest?.title ?? item.label}</p>
+                  {dest?.verified ? (
+                    <span className="shrink-0 rounded-md bg-teal-500/20 px-2 py-0.5 text-xs font-medium text-teal-300">
+                      Verificada
+                    </span>
+                  ) : null}
+                </div>
+                {dest?.customerInput && dest.matchedAlias ? (
+                  <p className="mt-1 text-sm text-amber-200">Cliente falou: {dest.customerInput}</p>
+                ) : null}
+                {item.number ? <p className="mt-1 text-sm text-slate-300">Número {item.number}</p> : null}
+                {!hasCoords ? (
+                  <p className="mt-1.5 text-xs text-amber-300">⚠️ Sem coordenadas confirmadas</p>
+                ) : (
+                  <p className="mt-1.5 text-xs text-teal-400">📍 Pronto para navegar</p>
+                )}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </Screen>
+  )
+}
+
+export function HistoryPage() {
+  const navigate = useNavigate()
+  const catalog = useCatalog()
+  const [items, setItems] = useState<LocalRecent[]>([])
+
+  useEffect(() => {
+    void db.recents.orderBy('createdAt').reverse().toArray().then((rows) => {
+      const seen = new Set<string>()
+      const unique: LocalRecent[] = []
+      for (const row of rows) {
+        const dest = row.destination
+        const key = dest?.id ?? row.entityId ?? `${row.entityKind || 'unknown'}:${row.title.toLowerCase()}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        unique.push(row)
+      }
+      setItems(unique)
+    })
+  }, [])
+
+  function selectRecent(item: LocalRecent) {
+    const restored = restoreSavedAddress(item, toRecords(catalog.data))
+    useUi.getState().setSelected(restored.destination, restored.number)
+    navigate('/')
+    if (restored.destination.latitude === null || restored.destination.longitude === null) {
+      useUi.getState().setNotice('Este destino não possui coordenadas confirmadas. Você pode informar uma correção no mapa.')
+    }
+  }
+
+  async function clearHistory() {
+    await db.recents.clear()
+    setItems([])
+    useUi.getState().setNotice('Histórico limpo com sucesso.')
+  }
+
+  return (
+    <Screen title="Histórico de Buscas">
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-xs text-slate-400">Últimos endereços pesquisados neste aparelho</p>
+        {items.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => void clearHistory()}
+            className="text-xs font-semibold text-rose-400 hover:underline"
+          >
+            Limpar histórico
+          </button>
+        ) : null}
+      </div>
+      {items.length === 0 ? <p className="text-slate-400">Nenhum endereço no histórico ainda.</p> : null}
+      <ul className="grid gap-2">
+        {items.map((item) => {
+          const dest = item.destination
+          const hasCoords = dest?.latitude !== null && dest?.longitude !== null
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                onClick={() => selectRecent(item)}
+                className="w-full rounded-2xl bg-[#1c242c] px-4 py-4 text-left transition hover:bg-white/5 active:scale-[0.99]"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-lg font-medium text-white">{dest?.title ?? item.title}</p>
+                  {dest?.verified ? (
+                    <span className="shrink-0 rounded-md bg-teal-500/20 px-2 py-0.5 text-xs font-medium text-teal-300">
+                      Verificada
+                    </span>
+                  ) : null}
+                </div>
+                {dest?.usedOldName && dest?.customerInput ? (
+                  <p className="mt-1 text-sm text-amber-300">
+                    🔄 Antiga: {dest.matchedAlias ?? dest.customerInput}
+                  </p>
+                ) : item.customerInput && item.customerInput !== (dest?.title ?? item.title) ? (
+                  <p className="mt-1 text-sm text-slate-300">
+                    Buscado: {item.customerInput}
+                  </p>
+                ) : null}
+                {item.number ? (
+                  <p className="mt-0.5 text-xs text-slate-400">Número: {item.number}</p>
+                ) : null}
+                {!hasCoords ? (
+                  <p className="mt-1.5 text-xs text-amber-300 flex items-center gap-1">
+                    <span>⚠️</span> Sem coordenadas no mapa
+                  </p>
+                ) : (
+                  <p className="mt-1.5 text-xs text-teal-400 flex items-center gap-1">
+                    <span>📍</span> Pronto para navegar
+                  </p>
+                )}
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </Screen>
   )
@@ -156,6 +293,7 @@ export function MorePage() {
       </div>
 
       <div className="grid gap-2">
+        <MenuLink to="/historico" label="Histórico de buscas" />
         <MenuLink to="/entender" label="Entender endereço" />
         <MenuLink to="/perfil" label="Perfil" />
         <MenuLink to="/configuracoes" label="Configurações" />

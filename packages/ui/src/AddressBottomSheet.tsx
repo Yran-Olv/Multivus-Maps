@@ -12,6 +12,13 @@ type AddressBottomSheetProps = {
   sourceDate?: string | null
   verified?: boolean
   hasGeometry?: boolean
+  hasCoordinates?: boolean
+  coordinatesVerified?: boolean
+  coordinateType?: string | null
+  coordinateSource?: string | null
+  coordinateSourceDate?: string | null
+  numberVerified?: boolean
+  resolvedNumber?: string | null
   streetNumber: string
   onStreetNumber: (value: string) => void
   onClose: () => void
@@ -60,6 +67,39 @@ export function AddressBottomSheet(props: AddressBottomSheetProps) {
         importanceScore={props.importanceScore}
         category={props.category}
       />
+      {props.hasCoordinates ? (
+        <div className={`mt-2 rounded-xl px-3.5 py-2.5 text-xs ${
+          props.coordinateType === 'address-point' && props.numberVerified
+            ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
+            : props.coordinateType === 'landmark'
+              ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
+              : 'bg-sky-50 text-sky-900 border border-sky-200'
+        }`}>
+          <p className="font-semibold flex items-center gap-1.5">
+            <span>{props.coordinateType === 'address-point' && props.numberVerified ? '✅ Ponto Predial Verificado' : props.coordinateType === 'landmark' ? '🏢 Ponto Comercial Verificado' : '🛣️ Acesso da Via (Geometria Mapeada)'}</span>
+            {props.numberVerified ? <span className="text-[11px] font-normal text-emerald-700">· Nº confirmado</span> : null}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-600">
+            {props.coordinateType === 'address-point' && props.numberVerified
+              ? 'Entrada predial com coordenadas geográficas conferidas no local.'
+              : props.coordinateType === 'landmark'
+                ? 'Local de referência comercial com coordenadas reais cadastradas.'
+                : props.streetNumber
+                  ? `Número ${props.streetNumber} não mapeado individualmente — navegando até o acesso da via.`
+                  : 'Navegando até o acesso da via em Santa Juliana.'}
+            {props.coordinateSource ? ` (Fonte: ${props.coordinateSource})` : ''}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-2 rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-2.5 text-xs text-amber-900">
+          <p className="font-semibold flex items-center gap-1.5">
+            <span>⚠️ Sem Geometria / Coordenadas</span>
+          </p>
+          <p className="mt-0.5 text-[11px] text-amber-800">
+            Esta rua ou ponto ainda não possui traçado geográfico no mapa de Santa Juliana. Você pode enviar uma correção para cadastrar.
+          </p>
+        </div>
+      )}
       <label className="mt-4 block text-sm text-slate-600">
         Número
         <input
@@ -162,43 +202,23 @@ export function AddressBottomSheet(props: AddressBottomSheetProps) {
           </div>
         </div>
       ) : (
-        /* Fallback sem geometria: Alerta claro e opções externas */
         <div className="mt-4 rounded-2xl bg-amber-50 border border-amber-200 p-4 text-amber-950">
           <p className="text-sm font-semibold flex items-center gap-1.5 text-amber-900">
-            <span>⚠️</span> Esta via ainda não possui geometria verificada no Multivus Maps.
+            <span>⚠️</span> {props.hasCoordinates
+              ? 'Destino com coordenada pendente de verificação.'
+              : 'Destino sem traçado ou coordenadas no mapa.'}
           </p>
           <p className="mt-1 text-xs text-amber-800">
-            Navegue usando o nome oficial atual ou antigo no seu aplicativo externo preferido:
+            {props.hasCoordinates
+              ? 'A posição geográfica deste endereço ainda não foi conferida no local.'
+              : 'Esta rua ainda não possui geometria traçada em Santa Juliana. Para evitar rotas fictícias, a navegação só é liberada com coordenadas reais.'}
           </p>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => props.onOpenExternal?.('google')}
-              className="h-11 rounded-xl bg-white border border-amber-300 text-xs font-semibold text-slate-800 shadow-sm hover:bg-amber-100/50"
-            >
-              Google Maps
-            </button>
-            <button
-              type="button"
-              onClick={() => props.onOpenExternal?.('waze')}
-              className="h-11 rounded-xl bg-white border border-amber-300 text-xs font-semibold text-slate-800 shadow-sm hover:bg-amber-100/50"
-            >
-              Waze
-            </button>
-            <button
-              type="button"
-              onClick={() => props.onOpenExternal?.('apple')}
-              className="h-11 rounded-xl bg-white border border-amber-300 text-xs font-semibold text-slate-800 shadow-sm hover:bg-amber-100/50"
-            >
-              Apple Maps
-            </button>
-          </div>
           <button
             type="button"
             onClick={props.onReport}
-            className="mt-3 w-full text-center text-xs font-medium text-amber-900 underline hover:text-amber-950"
+            className="mt-3 h-11 w-full rounded-xl bg-amber-200 text-sm font-semibold text-amber-950 hover:bg-amber-300 transition"
           >
-            Informar problema no mapa
+            Sugerir traçado ou relatar problema
           </button>
         </div>
       )}

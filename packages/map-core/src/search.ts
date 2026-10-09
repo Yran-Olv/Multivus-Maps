@@ -18,6 +18,11 @@ export type SearchableRecord = {
   sourceDate?: string | null
   latitude?: number | null
   longitude?: number | null
+  coordinatesVerified?: boolean
+  coordinateType?: 'address-point' | 'landmark' | 'place' | 'street' | 'street-access' | 'estimated' | null
+  coordinateSource?: string | null
+  coordinateSourceDate?: string | null
+  numberVerified?: boolean
   geometry?: unknown | null
   aliases?: SearchableAlias[]
   extraText?: string | null
@@ -65,6 +70,29 @@ export function trigramSimilarity(left: string, right: string): number {
     if (b.has(gram)) shared += 1
   }
   return (2 * shared) / (a.size + b.size)
+}
+
+export function deduplicateEntities<T extends { id: string; kind: string; score?: number | null; title?: string }>(items: T[]): T[] {
+  const entities = new Map<string, T>()
+  for (const item of items) {
+    const idKey = `${item.kind}:${item.id}`
+    const existing = entities.get(idKey)
+    if (!existing || (item.score ?? 0) > (existing.score ?? 0)) {
+      entities.set(idKey, item)
+    }
+  }
+
+  const byTitle = new Map<string, T>()
+  for (const item of entities.values()) {
+    const normTitle = (item.title ?? '').trim().toLowerCase()
+    const titleKey = `${item.kind}:${normTitle}`
+    const existing = byTitle.get(titleKey)
+    if (!existing || (item.score ?? 0) > (existing.score ?? 0)) {
+      byTitle.set(titleKey, item)
+    }
+  }
+
+  return [...byTitle.values()]
 }
 
 export function levenshtein(left: string, right: string): number {
@@ -125,6 +153,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   outro: '📍 Ponto de Referência',
 }
 
+function spatialRelationPrefix(value: string): string | null {
+  return value.match(/^(?:ao lado|em frente|no trevo|atras|perto|depois|antes|vizinho)\b/)?.[0] ?? null
+}
+
 export function searchRecords(
   records: SearchableRecord[],
   rawQuery: string,
@@ -132,6 +164,8 @@ export function searchRecords(
 ): RankedHit[] {
   const parsed = parseAddressText(rawQuery)
   const query = normalizeAddress(parsed.streetQuery)
+  const originalQuery = normalizeAddress(rawQuery)
+  const queryRelation = spatialRelationPrefix(normalizeAddress(parsed.reference ?? ''))
   if (query.length < 2) return []
 
   const stripped = query
@@ -146,23 +180,28 @@ export function searchRecords(
     const normExtra = normalizeAddress(record.extraText ?? '')
     const normNeigh = record.neighborhoodName ? normalizeAddress(record.neighborhoodName) : ''
 
-    const nameScore = Math.max(
-      scoreText(query, normTitle),
-      scoreText(targetQuery, normTitle),
-      scoreText(query, normExtra),
-      scoreText(targetQuery, normExtra),
-      normNeigh ? Math.max(scoreText(query, normNeigh), scoreText(targetQuery, normNeigh)) - 8 : 0,
-    )
+    const isSpatialReference = record.kind === 'reference' &&
+      /^(?:atras|perto|ao lado|em frente|depois|antes|no trevo|vizinho)\b/.test(normTitle)
+    if (isSpatialReference && (!queryRelation || spatialRelationPrefix(normTitle) !== queryRelation)) continue
+
+    const nameScore = record.kind === 'reference'
+      ? Math.max(scoreText(originalQuery, normTitle), scoreText(query, normTitle))
+      : Math.max(
+          scoreText(query, normTitle),
+          scoreText(targetQuery, normTitle),
+          scoreText(query, normExtra),
+          scoreText(targetQuery, normExtra),
+          normNeigh ? Math.max(scoreText(query, normNeigh), scoreText(targetQuery, normNeigh)) - 8 : 0,
+        )
 
     let aliasScore = 0
     let matchedAlias: string | null = null
     let matchedAliasType: string | null = null
     for (const alias of record.aliases ?? []) {
       const normAlias = normalizeAddress(alias.alias)
-      const current = Math.max(
-        scoreText(query, normAlias),
-        scoreText(targetQuery, normAlias),
-      )
+      const current = record.kind === 'reference'
+        ? scoreText(originalQuery, normAlias)
+        : Math.max(scoreText(query, normAlias), scoreText(targetQuery, normAlias))
       if (current > aliasScore) {
         aliasScore = current
         matchedAlias = alias.alias
@@ -170,7 +209,7 @@ export function searchRecords(
       }
     }
     const rawScore = Math.max(nameScore, aliasScore)
-    if (rawScore < 40) continue
+    if (rawScore < (record.kind === 'reference' ? 55 : 40)) continue
 
     const importance = record.importanceScore ?? (record.kind === 'landmark' ? 70 : 60)
     // Pondera a pontuação pelo ranking de importância (estabelecimentos de referência recebem impulso no topo)
@@ -239,8 +278,15 @@ export function searchRecords(
     })
   }
 
-  hits.sort((a, b) => b.score - a.score || (b.importanceScore ?? 0) - (a.importanceScore ?? 0) || a.title.localeCompare(b.title, 'pt-BR'))
-  return hits.slice(0, limit)
+  const ranked = deduplicateEntities(hits)
+  const prefersReference = parsed.reference !== null
+  ranked.sort((a, b) =>
+    b.score - a.score ||
+    (prefersReference ? Number(b.kind === 'reference') - Number(a.kind === 'reference') : 0) ||
+    (b.importanceScore ?? 0) - (a.importanceScore ?? 0) ||
+    a.title.localeCompare(b.title, 'pt-BR'),
+  )
+  return ranked.slice(0, limit)
 }
 
 export function describeStreet(input: {

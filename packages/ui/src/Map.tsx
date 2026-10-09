@@ -19,9 +19,17 @@ export type MapLine = {
   name?: string
 }
 
+export type MapFitBoundsOptions = {
+  padding?: number | { top: number; bottom: number; left: number; right: number }
+  maxZoom?: number
+  duration?: number
+}
+
 export type MapHandle = {
   flyTo: (longitude: number, latitude: number, zoom?: number) => void
-  fitBounds: (coordinates: [number, number][]) => void
+  easeTo: (longitude: number, latitude: number, zoom?: number, duration?: number) => void
+  stop: () => void
+  fitBounds: (coordinates: [number, number][], options?: MapFitBoundsOptions) => void
   getCenter: () => { longitude: number; latitude: number }
   resize: () => void
 }
@@ -37,6 +45,7 @@ type MapProps = {
   radiusArea?: { longitude: number; latitude: number; radiusMeters: number; label?: string } | null
   onClick?: (point: { longitude: number; latitude: number }) => void
   onMove?: (center: { longitude: number; latitude: number }) => void
+  onUserMove?: () => void
   className?: string
   handle?: Ref<MapHandle>
 }
@@ -61,6 +70,7 @@ export function Map({
   radiusArea = null,
   onClick,
   onMove,
+  onUserMove,
   className,
   handle,
 }: MapProps) {
@@ -68,21 +78,45 @@ export function Map({
   const mapRef = useRef<MapLibreMap | null>(null)
   const onClickRef = useRef(onClick)
   const onMoveRef = useRef(onMove)
+  const onUserMoveRef = useRef(onUserMove)
   const [unavailable, setUnavailable] = useState(false)
   onClickRef.current = onClick
   onMoveRef.current = onMove
+  onUserMoveRef.current = onUserMove
 
   useImperativeHandle(handle, () => ({
     flyTo(longitude, latitude, zoom = 16) {
       mapRef.current?.flyTo({ center: [longitude, latitude], zoom })
     },
-    fitBounds(coordinates: [number, number][]) {
+    easeTo(longitude, latitude, zoom, duration = 500) {
+      const map = mapRef.current
+      if (!map) return
+      map.stop()
+      map.easeTo({
+        center: [longitude, latitude],
+        ...(zoom === undefined ? {} : { zoom }),
+        duration,
+      })
+    },
+    stop() {
+      mapRef.current?.stop()
+    },
+    fitBounds(coordinates: [number, number][], options?: MapFitBoundsOptions) {
       if (!coordinates.length || !mapRef.current) return
+      const valid = coordinates.filter(([longitude, latitude]) =>
+        Number.isFinite(longitude) &&
+        Number.isFinite(latitude) &&
+        longitude >= -180 &&
+        longitude <= 180 &&
+        latitude >= -90 &&
+        latitude <= 90,
+      )
+      if (!valid.length) return
       let minLng = Infinity
       let minLat = Infinity
       let maxLng = -Infinity
       let maxLat = -Infinity
-      for (const [lng, lat] of coordinates) {
+      for (const [lng, lat] of valid) {
         if (lng < minLng) minLng = lng
         if (lng > maxLng) maxLng = lng
         if (lat < minLat) minLat = lat
@@ -93,7 +127,11 @@ export function Map({
           [minLng, minLat],
           [maxLng, maxLat],
         ],
-        { padding: 60, maxZoom: 17, duration: 1000 },
+        {
+          padding: options?.padding ?? 60,
+          maxZoom: options?.maxZoom ?? 17,
+          duration: options?.duration ?? 800,
+        },
       )
     },
     getCenter() {
@@ -237,6 +275,8 @@ export function Map({
     map.on('click', (event) => {
       onClickRef.current?.({ longitude: event.lngLat.lng, latitude: event.lngLat.lat })
     })
+    map.on('dragstart', () => onUserMoveRef.current?.())
+    map.on('touchstart', () => onUserMoveRef.current?.())
     map.on('moveend', () => {
       const center = map.getCenter()
       onMoveRef.current?.({ longitude: center.lng, latitude: center.lat })

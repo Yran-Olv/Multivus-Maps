@@ -5,6 +5,7 @@ import placeSeed from '@data/santa-juliana/places.seed.json'
 import streetSeed from '@data/santa-juliana/streets.seed.json'
 import reportData from '@data/import/reports/santa-juliana.json'
 import { normalizeAddress } from '@multivus/map-core'
+export { pointOf } from './coordinates'
 import type { LocalLandmark, LocalNeighborhood, LocalPlace, LocalReference, LocalStreet } from '@multivus/offline'
 import { api } from './api'
 import { db } from './db'
@@ -46,7 +47,7 @@ export async function ensureSeed(): Promise<void> {
           officialName: street.officialName,
           streetType: street.streetType,
           neighborhoodName: null,
-          verified: Boolean(geom),
+          verified: Boolean(street.verified),
           source: geom ? 'OpenStreetMap' : street.source,
           sourceDate: street.sourceDate,
           geometry: geom,
@@ -269,33 +270,6 @@ type ApiPlace = {
 type ApiNeighborhood = {
   id: string
   name: string
-}
-
-export function pointOf(geometry: unknown): { latitude: number; longitude: number } | null {
-  if (!geometry || typeof geometry !== 'object') return null
-  const value = geometry as { type?: string; coordinates?: unknown }
-  if (value.type === 'Point' && Array.isArray(value.coordinates)) {
-    const [longitude, latitude] = value.coordinates as number[]
-    if (typeof longitude === 'number' && typeof latitude === 'number') return { longitude, latitude }
-  }
-  if (value.type === 'LineString' && Array.isArray(value.coordinates) && value.coordinates.length > 0) {
-    const coords = value.coordinates as number[][]
-    const mid = coords[Math.floor(coords.length / 2)] || coords[0]
-    if (mid && typeof mid[0] === 'number' && typeof mid[1] === 'number') {
-      return { longitude: mid[0], latitude: mid[1] }
-    }
-  }
-  if (value.type === 'MultiLineString' && Array.isArray(value.coordinates) && value.coordinates.length > 0) {
-    const lines = value.coordinates as number[][][]
-    const longest = [...lines].sort((a, b) => b.length - a.length)[0]
-    if (longest && longest.length > 0) {
-      const mid = longest[Math.floor(longest.length / 2)] || longest[0]
-      if (mid && typeof mid[0] === 'number' && typeof mid[1] === 'number') {
-        return { longitude: mid[0], latitude: mid[1] }
-      }
-    }
-  }
-  return null
 }
 
 export function lineOf(id: string, geometry: unknown): { id: string; coordinates: [number, number][] } | null {

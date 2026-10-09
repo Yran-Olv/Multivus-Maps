@@ -10,6 +10,7 @@
     "build": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@multivus/shared": "workspace:*",
     "dexie": "^4.2.0"
   },
   "devDependencies": {

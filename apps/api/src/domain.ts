@@ -18,7 +18,7 @@ import {
   streets,
   type Database,
 } from '@multivus/database'
-import { confidenceOf, describeStreet, normalizeAddress, parseAddressText } from '@multivus/map-core'
+import { confidenceOf, deduplicateEntities, describeStreet, normalizeAddress, parseAddressText } from '@multivus/map-core'
 import type {
   ConfirmEntityInput,
   CreateAddressPointInput,
@@ -352,6 +352,9 @@ export async function getStreet(db: Database, id: string): Promise<StreetRecord 
 export async function searchCatalog(db: Database, rawQuery: string, limit: number): Promise<SearchResult[]> {
   const parsed = parseAddressText(rawQuery)
   const term = normalizeAddress(parsed.streetQuery)
+  const originalTerm = normalizeAddress(rawQuery)
+  const relationPrefix = normalizeAddress(parsed.reference ?? '')
+    .match(/^(?:ao lado|em frente|no trevo|atras|perto|depois|antes|vizinho)\b/)?.[0] ?? null
   if (term.length < 2) return []
 
   const stripped = term
@@ -373,6 +376,11 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     aliases: unknown
     matchedAlias: string | null
     matchedAliasType: string | null
+    addressNumber: string | null
+    addressLatitude: number | null
+    addressLongitude: number | null
+    addressSource: string | null
+    addressSourceDate: string | null
     nameScore: number
     aliasScore: number
     score: number
@@ -393,6 +401,11 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
       ), '[]'::json) AS aliases,
       best.alias AS "matchedAlias",
       best.alias_type AS "matchedAliasType",
+      address_point.number AS "addressNumber",
+      ST_Y(address_point.geometry)::float8 AS "addressLatitude",
+      ST_X(address_point.geometry)::float8 AS "addressLongitude",
+      address_point.source AS "addressSource",
+      address_point.source_date AS "addressSourceDate",
       similarity(s.normalized_name, ${term}) AS "nameScore",
       COALESCE(best.alias_score, 0) AS "aliasScore",
       GREATEST(
@@ -408,6 +421,15 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
       ORDER BY similarity(normalized_alias, ${term}) DESC
       LIMIT 1
     ) best ON true
+    LEFT JOIN LATERAL (
+      SELECT number, geometry, source, source_date
+      FROM address_points
+      WHERE street_id = s.id
+        AND number = ${parsed.number ?? ''}
+        AND verified = true
+      ORDER BY confidence_score DESC, updated_at DESC
+      LIMIT 1
+    ) address_point ON true
     WHERE s.active = true
       AND (
         s.normalized_name LIKE ${'%' + term + '%'}
@@ -545,20 +567,24 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
       lr.confirmations_count AS "confirmationsCount",
       lr.confidence_score AS "confidenceScore",
       lr.verified,
-      similarity(lr.normalized_phrase, ${term}) AS score
+      similarity(lr.normalized_phrase, ${originalTerm}) AS score
     FROM local_references lr
     LEFT JOIN streets s ON s.id = lr.target_street_id
     LEFT JOIN landmarks lm ON lm.id = lr.landmark_id
     WHERE lr.active = true
       AND (
-        lr.normalized_phrase LIKE ${'%' + term + '%'}
-        OR similarity(lr.normalized_phrase, ${term}) > 0.25
+        lr.normalized_phrase LIKE ${'%' + originalTerm + '%'}
+        OR similarity(lr.normalized_phrase, ${originalTerm}) > 0.25
       )
     ORDER BY score DESC
     LIMIT ${limit}
   `)
 
-  const referenceHits: SearchResult[] = rowsOf(referenceResult).map((row) => ({
+  const referenceHits: SearchResult[] = rowsOf(referenceResult).filter((row) => {
+    const candidateRelation = normalizeAddress(row.popularPhrase)
+      .match(/^(?:ao lado|em frente|no trevo|atras|perto|depois|antes|vizinho)\b/)?.[0] ?? null
+    return !candidateRelation || candidateRelation === relationPrefix
+  }).map((row) => ({
     kind: 'reference' as const,
     id: row.id,
     title: row.popularPhrase,
@@ -632,6 +658,15 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
       matchedAlias: aliasWins ? row.matchedAlias : null,
       matchedAliasType: aliasWins ? row.matchedAliasType : null,
     })
+    const hasVerifiedAddressPoint = Boolean(
+      row.addressNumber &&
+      row.addressLatitude !== null &&
+      row.addressLongitude !== null &&
+      row.addressLatitude >= -90 &&
+      row.addressLatitude <= 90 &&
+      row.addressLongitude >= -180 &&
+      row.addressLongitude <= 180,
+    )
     return {
       kind: 'street' as const,
       id: row.id,
@@ -644,8 +679,14 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
       verified: row.verified,
       source: row.source,
       sourceDate: row.sourceDate,
-      latitude: null,
-      longitude: null,
+      number: row.addressNumber,
+      latitude: hasVerifiedAddressPoint ? row.addressLatitude : null,
+      longitude: hasVerifiedAddressPoint ? row.addressLongitude : null,
+      coordinatesVerified: hasVerifiedAddressPoint,
+      coordinateType: hasVerifiedAddressPoint ? 'address-point' : null,
+      coordinateSource: row.addressSource,
+      coordinateSourceDate: row.addressSourceDate,
+      numberVerified: hasVerifiedAddressPoint,
       geometry: row.geometry,
       warning: described.warning,
       usedOldName: described.usedOldName,
@@ -702,14 +743,18 @@ export async function searchCatalog(db: Database, rawQuery: string, limit: numbe
     importanceScore: 40,
   }))
 
-  const allHits = [
+  const allHits = deduplicateEntities([
     ...referenceHits,
     ...streetHits,
     ...landmarkHits,
     ...placeHits,
     ...neighborhoodHits,
-  ]
-  allHits.sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.importanceScore ?? 0) - (a.importanceScore ?? 0))
+  ])
+  allHits.sort((a, b) =>
+    (b.score ?? 0) - (a.score ?? 0) ||
+    (relationPrefix ? Number(b.kind === 'reference') - Number(a.kind === 'reference') : 0) ||
+    (b.importanceScore ?? 0) - (a.importanceScore ?? 0),
+  )
   const topHit = allHits[0] ?? null
 
   // Aprendizado local: registra o termo buscado e o resultado
@@ -1078,11 +1123,7 @@ export async function approveOsmGeometry(
       geometry = ST_SetSRID(ST_GeomFromGeoJSON(${geomStr}), 4326),
       geometry_source = ${input.source ?? 'OpenStreetMap'},
       geometry_source_date = to_char(now(), 'YYYY-MM-DD'),
-      geometry_verified = true,
-      verified = true,
-      confidence_score = 100,
-      verified_by = ${userId}::uuid,
-      verified_at = now()
+      geometry_verified = true
     WHERE id = ${input.streetId}
   `)
 
@@ -1603,4 +1644,3 @@ export async function storeRefresh(db: Database, userId: string, jti: string, ex
     expiresAt,
   })
 }
-

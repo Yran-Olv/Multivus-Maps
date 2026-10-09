@@ -4,6 +4,7 @@ import {
   formatNavigationDistance,
   formatNavigationDuration,
   formatShareText,
+  haversineDistance,
   updateNavigationProgress,
   type NavigationDestination,
   type NavigationSession,
@@ -21,10 +22,11 @@ import {
   SearchBar,
   type MapHandle,
 } from '@multivus/ui'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { usePlatform } from '../platform/context'
 import { linesOf } from '../lib/catalog'
+import { hasValidDestinationCoordinates, isNavigableDestination } from '../lib/destination'
 import { db } from '../lib/db'
 import { useSession } from '../lib/session'
 import { flushPending, isUuid } from '../lib/sync'
@@ -37,6 +39,13 @@ const routing = createRoutingProvider({
   provider: env?.VITE_ROUTING_PROVIDER || 'osrm',
   osrmBaseUrl: env?.VITE_OSRM_BASE_URL || 'https://router.project-osrm.org',
 })
+
+const configuredNavigationZoom = Number.parseFloat(env?.VITE_NAVIGATION_ZOOM ?? '15')
+const NAVIGATION_ZOOM = Number.isFinite(configuredNavigationZoom)
+  ? Math.min(19, Math.max(15, configuredNavigationZoom))
+  : 15
+const CAMERA_MINIMUM_SHIFT_METERS = 12
+const CAMERA_UPDATE_INTERVAL_MS = 450
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -60,9 +69,18 @@ export function HomePage() {
   const [routeFailed, setRouteFailed] = useState(false)
   const [navSession, setNavSession] = useState<NavigationSession | null>(null)
   const [currentGps, setCurrentGps] = useState<GeoPosition | null>(null)
+  const [following, setFollowing] = useState(false)
+  const [gpsUnavailable, setGpsUnavailable] = useState(false)
 
   const watchUnsubRef = useRef<(() => void) | null>(null)
   const isRecalculatingRef = useRef(false)
+  const navSessionRef = useRef<NavigationSession | null>(null)
+  const followingRef = useRef(false)
+  const onlineRef = useRef(online)
+  const cameraPointRef = useRef<{ latitude: number; longitude: number } | null>(null)
+  const cameraUpdateAtRef = useRef(0)
+  const routeRequestRef = useRef(0)
+  onlineRef.current = online
 
   useEffect(() => {
     return () => {
@@ -88,38 +106,42 @@ export function HomePage() {
     if (pin) {
       list.push({ id: 'correction-pin', longitude: pin.longitude, latitude: pin.latitude, color: '#e15b64' })
     }
-    if (selected && selected.latitude !== null && selected.longitude !== null) {
+    if (selected && hasValidDestinationCoordinates(selected)) {
       list.push({ id: 'destination-pin', longitude: selected.longitude, latitude: selected.latitude, color: '#f59e0b' })
     }
     return list
   }, [pin, selected])
 
-  useEffect(() => {
-    setGoMessage(null)
-    setActiveRoute(null)
-    setRouteFailed(false)
-    stopNavigation()
-
-    if (!selected) return
-
-    // Centraliza no mapa e traça o trajeto automaticamente
-    if (selected.latitude !== null && selected.longitude !== null) {
-      mapRef.current?.flyTo(selected.longitude, selected.latitude, 16)
-      void calculateAndShowRoute(selected)
+  const stopNavigation = useCallback(() => {
+    if (watchUnsubRef.current) {
+      watchUnsubRef.current()
+      watchUnsubRef.current = null
     }
-  }, [selected?.id])
+    platform.voice.stop()
+    navSessionRef.current = null
+    setNavSession(null)
+    followingRef.current = false
+    setFollowing(false)
+    useUi.getState().setNavigating(false)
+  }, [platform])
 
-  async function calculateAndShowRoute(target: typeof selected) {
-    if (!target || target.latitude === null || target.longitude === null) return
+  const calculateAndShowRoute = useCallback(async (
+    target: typeof selected,
+    requestedNumber: string,
+    requestId: number,
+  ) => {
+    if (!target || !isNavigableDestination(target, requestedNumber)) return
 
-    let userPos = location
+    let userPos = useUi.getState().location
     if (!userPos) {
       try {
         userPos = await platform.location.getCurrentPosition()
         useUi.getState().setLocation(userPos)
-      } catch {
-        // Fallback: Centro urbano de Santa Juliana
-        userPos = { latitude: -19.30889, longitude: -47.52417 }
+      } catch (error) {
+        if (requestId !== routeRequestRef.current) return
+        setRouteFailed(true)
+        setGoMessage(error instanceof Error ? `GPS indisponível: ${error.message}` : 'GPS indisponível para calcular a rota.')
+        return
       }
     }
 
@@ -131,29 +153,57 @@ export function HomePage() {
         { latitude: target.latitude, longitude: target.longitude },
       )
 
-      if (routeResult.status === 'ok' && routeResult.geometry) {
+      if (requestId !== routeRequestRef.current) return
+      if (routeResult.status === 'ok' && routeResult.geometry && routeResult.geometry.coordinates.length >= 2) {
         setActiveRoute(routeResult)
         mapRef.current?.fitBounds(routeResult.geometry.coordinates)
-        setGoMessage(
-          `Trajeto traçado: ${(routeResult.distance / 1000).toFixed(1)} km (~${Math.max(1, Math.round(routeResult.duration / 60))} min).`,
-        )
+        setGoMessage(`Trajeto traçado: ${(routeResult.distance / 1000).toFixed(1)} km (~${Math.max(1, Math.round(routeResult.duration / 60))} min).`)
       } else {
         setRouteFailed(true)
         setGoMessage(routeResult.message || 'Não foi possível traçar a rota.')
       }
     } catch (err) {
+      if (requestId !== routeRequestRef.current) return
       console.warn('Erro ao traçar rota automática:', err)
       setRouteFailed(true)
       setGoMessage('Não foi possível calcular a rota.')
     }
-  }
+  }, [platform.location])
+
+  useEffect(() => {
+    const requestId = ++routeRequestRef.current
+    setGoMessage(null)
+    setActiveRoute(null)
+    setRouteFailed(false)
+    stopNavigation()
+
+    if (!selected) return
+
+    if (hasValidDestinationCoordinates(selected)) {
+      mapRef.current?.flyTo(selected.longitude, selected.latitude, 16)
+      if (isNavigableDestination(selected, number)) {
+        void calculateAndShowRoute(selected, number, requestId)
+      } else {
+        setGoMessage('Há um ponto no mapa, mas ele não confirma a entrada nem o número predial. A rota precisa de uma coordenada verificada.')
+      }
+    } else {
+      setGoMessage('Este endereço não possui coordenadas de destino. Informe uma correção para ajudar a localizar o ponto.')
+    }
+  }, [selected, number, calculateAndShowRoute, stopNavigation])
 
   async function centerOnMe() {
     setBusy(true)
     try {
       const position = await platform.location.getCurrentPosition()
       useUi.getState().setLocation(position)
-      mapRef.current?.flyTo(position.longitude, position.latitude)
+      if (navSessionRef.current?.isNavigating) {
+        followingRef.current = true
+        setFollowing(true)
+        cameraPointRef.current = position
+        mapRef.current?.easeTo(position.longitude, position.latitude, NAVIGATION_ZOOM, 650)
+      } else {
+        mapRef.current?.easeTo(position.longitude, position.latitude, NAVIGATION_ZOOM, 550)
+      }
     } catch (error) {
       useUi.getState().setNotice(error instanceof Error ? error.message : 'Localização indisponível')
     } finally {
@@ -161,98 +211,137 @@ export function HomePage() {
     }
   }
 
-  function stopNavigation() {
-    if (watchUnsubRef.current) {
-      watchUnsubRef.current()
-      watchUnsubRef.current = null
-    }
-    platform.voice.stop()
-    setNavSession(null)
-  }
-
   function toggleVoice() {
     setNavSession((prev) => {
       if (!prev) return null
       const nextVoice = !prev.voiceEnabled
       platform.voice.setEnabled(nextVoice)
-      return { ...prev, voiceEnabled: nextVoice }
+      const updated = { ...prev, voiceEnabled: nextVoice }
+      navSessionRef.current = updated
+      return updated
     })
   }
 
   async function triggerRecalculate(pos: { latitude: number; longitude: number }, destination: NavigationDestination) {
-    if (isRecalculatingRef.current || !online) return
+    if (isRecalculatingRef.current) return
+    if (!onlineRef.current) {
+      const current = navSessionRef.current
+      if (current) {
+        const updated = { ...current, status: 'recalculating' as const, statusMessage: 'Sem conexão. Mantendo a rota carregada.' }
+        navSessionRef.current = updated
+        setNavSession(updated)
+      }
+      return
+    }
     isRecalculatingRef.current = true
     try {
       const routeResult = await routing.calculateRoute(
         { latitude: pos.latitude, longitude: pos.longitude },
         { latitude: destination.latitude, longitude: destination.longitude },
       )
-      if (routeResult.status === 'ok' && routeResult.geometry) {
+      if (routeResult.status === 'ok' && routeResult.geometry && routeResult.geometry.coordinates.length >= 2) {
         setActiveRoute(routeResult)
         platform.voice.speak('Rota recalculada.')
         setNavSession((curr) => {
           if (!curr) return null
-          return {
+          const updated = {
             ...curr,
             activeRoute: routeResult,
             currentStepIndex: 0,
+            routeProgressMeters: 0,
             remainingDistance: routeResult.distance,
             remainingDuration: routeResult.duration,
             currentInstruction: routeResult.steps[0]?.instruction || curr.currentInstruction,
             nextInstruction: routeResult.steps[1]?.instruction,
             distanceToNextManeuver: routeResult.steps[0]?.distance || routeResult.distance,
             isOffRoute: false,
-            status: 'navigating',
+            status: 'navigating' as const,
             statusMessage: 'Rota recalculada',
           }
+          navSessionRef.current = updated
+          return updated
         })
+      } else {
+        const current = navSessionRef.current
+        if (current) {
+          const updated = { ...current, status: 'recalculating' as const, statusMessage: routeResult.message || 'Não foi possível recalcular. Mantendo a rota carregada.' }
+          navSessionRef.current = updated
+          setNavSession(updated)
+        }
       }
     } catch (err) {
       console.warn('Falha ao recalcular rota:', err)
+      const current = navSessionRef.current
+      if (current) {
+        const updated = { ...current, status: 'recalculating' as const, statusMessage: 'Falha no recálculo. Mantendo a rota carregada.' }
+        navSessionRef.current = updated
+        setNavSession(updated)
+      }
     } finally {
       isRecalculatingRef.current = false
     }
   }
 
   function handleGpsProgress(pos: GeoPosition) {
+    setGpsUnavailable(false)
     setCurrentGps(pos)
     useUi.getState().setLocation(pos)
-    setNavSession((prev) => {
-      if (!prev || !prev.isNavigating) return prev
+    const previous = navSessionRef.current
+    if (!previous?.isNavigating) return
 
-      // Suavemente centraliza e acompanha o usuário durante a rota
-      mapRef.current?.flyTo(pos.longitude, pos.latitude, 17)
+    const now = Date.now()
+    const lastCameraPoint = cameraPointRef.current
+    const cameraDistance = lastCameraPoint
+      ? haversineDistance([lastCameraPoint.longitude, lastCameraPoint.latitude], [pos.longitude, pos.latitude])
+      : Infinity
 
-      const result = updateNavigationProgress(prev, [pos.longitude, pos.latitude])
+    if (followingRef.current && cameraDistance >= CAMERA_MINIMUM_SHIFT_METERS && now - cameraUpdateAtRef.current >= CAMERA_UPDATE_INTERVAL_MS) {
+      mapRef.current?.easeTo(pos.longitude, pos.latitude, NAVIGATION_ZOOM, CAMERA_UPDATE_INTERVAL_MS)
+      cameraPointRef.current = pos
+      cameraUpdateAtRef.current = now
+    }
 
-      if (result.announcement) {
-        platform.voice.speak(result.announcement)
-      }
-
-      // Se saiu da rota (> 40m), dispara recálculo automático
-      if (result.session.isOffRoute && !isRecalculatingRef.current && online) {
-        void triggerRecalculate(pos, result.session.destination)
-      }
-
-      // Se chegou ao destino (< 30m)
-      if (result.session.isArrived) {
-        stopNavigation()
-        useUi.getState().setNotice('Você chegou ao destino!')
-      }
-
-      return result.session
+    const result = updateNavigationProgress(previous, [pos.longitude, pos.latitude], {
+      positionAccuracyMeters: pos.accuracy,
     })
+    navSessionRef.current = result.session
+    setNavSession(result.session)
+    if (result.announcement) platform.voice.speak(result.announcement)
+
+    if (result.session.isOffRoute && !isRecalculatingRef.current && onlineRef.current) {
+      void triggerRecalculate(pos, result.session.destination)
+    }
+    if (result.session.isArrived) {
+      watchUnsubRef.current?.()
+      watchUnsubRef.current = null
+      useUi.getState().setNotice('Você chegou ao destino!')
+    }
   }
 
-  async function startTurnByTurn(route: RouteCalculationResult, destination: NavigationDestination) {
+  async function startTurnByTurn(
+    route: RouteCalculationResult,
+    destination: NavigationDestination,
+    origin: GeoPosition,
+  ) {
+    if (route.status !== 'ok' || !route.geometry || route.geometry.coordinates.length < 2) {
+      setRouteFailed(true)
+      setGoMessage('A rota não possui geometria válida para iniciar a navegação.')
+      return
+    }
     const session = createNavigationSession(route, destination, { voiceEnabled: true })
+    navSessionRef.current = session
     setNavSession(session)
+    followingRef.current = true
+    setFollowing(true)
+    useUi.getState().setNavigating(true)
+    setGpsUnavailable(false)
     setGoMessage(null)
     setRouteFailed(false)
+    cameraPointRef.current = origin
+    cameraUpdateAtRef.current = Date.now()
+    mapRef.current?.easeTo(origin.longitude, origin.latitude, NAVIGATION_ZOOM, 700)
 
-    if (session.currentInstruction) {
-      platform.voice.speak(`Iniciando navegação. ${session.currentInstruction}`)
-    }
+    platform.voice.speak(`Iniciando navegação. ${session.currentInstruction}`)
 
     if (watchUnsubRef.current) {
       watchUnsubRef.current()
@@ -261,42 +350,40 @@ export function HomePage() {
 
     try {
       const unsub = await platform.location.watchPosition(
-        (pos) => {
-          useUi.getState().setLocation(pos)
-          handleGpsProgress(pos)
-        },
-        (err) => {
-          console.warn('Erro ao acompanhar GPS contínuo:', err)
+        (position) => handleGpsProgress(position),
+        (error) => {
+          setGpsUnavailable(true)
+          console.warn('Erro ao acompanhar GPS contínuo:', error)
         },
       )
       watchUnsubRef.current = unsub
-    } catch (err) {
-      console.warn('Não foi possível iniciar GPS contínuo:', err)
+    } catch (error) {
+      setGpsUnavailable(true)
+      console.warn('Não foi possível iniciar GPS contínuo:', error)
     }
   }
 
   async function go() {
     if (!selected) return
     const place = [selected.title, number].filter(Boolean).join(', ')
-
-    if (selected.latitude === null || selected.longitude === null) {
-      setRouteFailed(true)
-      setGoMessage('Esta via ainda não possui coordenadas no mapa.')
+    if (!isNavigableDestination(selected, number)) {
+      setGoMessage('Este destino não possui um ponto confirmado para navegação. Informe uma correção antes de iniciar.')
       return
     }
 
     setRouteFailed(false)
-    setGoMessage('Obtendo sua localização...')
-
-    let userPos = location
-    if (!userPos) {
-      try {
-        userPos = await platform.location.getCurrentPosition()
-        useUi.getState().setLocation(userPos)
-      } catch {
-        // Fallback para o centro urbano de Santa Juliana se GPS não estiver disponível
-        userPos = { latitude: -19.30889, longitude: -47.52417 }
-      }
+    setGpsUnavailable(false)
+    setGoMessage('Obtendo sua localização GPS...')
+    let userPos: GeoPosition
+    try {
+      userPos = await platform.location.getCurrentPosition()
+      useUi.getState().setLocation(userPos)
+      setCurrentGps(userPos)
+    } catch (error) {
+      setGpsUnavailable(true)
+      setRouteFailed(true)
+      setGoMessage(error instanceof Error ? `GPS indisponível: ${error.message}` : 'GPS indisponível. Permita o acesso à localização e tente novamente.')
+      return
     }
 
     const destination: NavigationDestination = {
@@ -304,33 +391,21 @@ export function HomePage() {
       latitude: selected.latitude,
       longitude: selected.longitude,
     }
-
-    // Se a rota já foi calculada e o usuário clicou para iniciar:
-    if (activeRoute && activeRoute.status === 'ok') {
-      await startTurnByTurn(activeRoute, destination)
-      return
-    }
-
     setGoMessage('Calculando rota no Multivus Maps...')
     try {
       const routeResult = await routing.calculateRoute(
         { latitude: userPos.latitude, longitude: userPos.longitude },
         { latitude: selected.latitude, longitude: selected.longitude },
       )
-
-      if (routeResult.status === 'ok' && routeResult.geometry) {
+      if (routeResult.status === 'ok' && routeResult.geometry && routeResult.geometry.coordinates.length >= 2) {
         setActiveRoute(routeResult)
-        mapRef.current?.fitBounds(routeResult.geometry.coordinates)
-        setGoMessage(
-          `Rota calculada: ${(routeResult.distance / 1000).toFixed(1)} km (~${Math.max(1, Math.round(routeResult.duration / 60))} min).`,
-        )
-        // Inicia automaticamente o modo de navegação guiada no Multivus Maps
-        await startTurnByTurn(routeResult, destination)
+        mapRef.current?.fitBounds(routeResult.geometry.coordinates, { padding: 80, maxZoom: NAVIGATION_ZOOM, duration: 550 })
+        await startTurnByTurn(routeResult, destination, userPos)
         return
       }
 
       setRouteFailed(true)
-      setGoMessage(routeResult.message || 'Não foi possível calcular a rota no Multivus Maps.')
+      setGoMessage(routeResult.message || 'Não foi possível calcular uma rota válida no Multivus Maps.')
     } catch (error) {
       console.warn('Erro ao calcular rota OSRM:', error)
       setRouteFailed(true)
@@ -341,6 +416,10 @@ export function HomePage() {
   async function openExternal(app?: 'google' | 'waze' | 'apple') {
     if (!selected) return
     const place = [selected.title, number].filter(Boolean).join(', ')
+    if (!isNavigableDestination(selected, number)) {
+      useUi.getState().setNotice('Sem um ponto de destino confirmado; o endereço foi mantido no Multivus Maps para correção.')
+      return
+    }
     await platform.navigation.openExternalMap(app || 'google', {
       label: place,
       latitude: selected.latitude,
@@ -356,6 +435,10 @@ export function HomePage() {
       label: number ? `${selected.title}, ${number}` : selected.title,
       streetId: selected.kind === 'street' ? selected.id : null,
       placeId: selected.kind === 'place' ? selected.id : null,
+      entityId: selected.id,
+      entityKind: selected.kind,
+      number,
+      destination: selected,
       customerInput: selected.customerInput,
       matchedAlias: selected.matchedAlias,
       createdAt: new Date().toISOString(),
@@ -451,7 +534,7 @@ export function HomePage() {
         points={points}
         userLocation={location}
         radiusArea={
-          selected?.latitude && selected?.longitude && selected?.probableRadiusMeters
+          selected && hasValidDestinationCoordinates(selected) && selected.probableRadiusMeters
             ? {
                 longitude: selected.longitude,
                 latitude: selected.latitude,
@@ -461,10 +544,14 @@ export function HomePage() {
             : null
         }
         onClick={correctionOpen ? (point) => setPin(point) : undefined}
+        onUserMove={() => {
+          if (!navSessionRef.current?.isNavigating) return
+          followingRef.current = false
+          setFollowing(false)
+        }}
       />
 
-      {/* 1. MODO NAVEGAÇÃO ATIVA: NavigationHud Guiado em Tempo Real */}
-      {navSession && navSession.isNavigating ? (
+      {navSession ? (
         <NavigationHud
           instruction={navSession.currentInstruction}
           nextInstruction={navSession.nextInstruction}
@@ -476,10 +563,21 @@ export function HomePage() {
           maneuverModifier={navSession.activeRoute.steps?.[navSession.currentStepIndex]?.maneuverModifier}
           speedKmh={currentGps?.speed !== null && currentGps?.speed !== undefined ? currentGps.speed * 3.6 : null}
           offline={!online}
+          gpsUnavailable={gpsUnavailable}
           isRecalculating={navSession.status === 'recalculating' || navSession.isOffRoute}
           isArrived={navSession.isArrived}
+          statusMessage={navSession.statusMessage}
+          following={following}
           voiceEnabled={navSession.voiceEnabled}
           onToggleVoice={toggleVoice}
+          onResumeFollowing={() => {
+            const position = currentGps ?? location
+            if (!position) return
+            followingRef.current = true
+            setFollowing(true)
+            cameraPointRef.current = position
+            mapRef.current?.easeTo(position.longitude, position.latitude, NAVIGATION_ZOOM, 650)
+          }}
           onRecalculate={() => {
             const pt = currentGps || location
             if (pt && navSession) {
@@ -536,7 +634,14 @@ export function HomePage() {
               source={selected.source}
               sourceDate={selected.sourceDate}
               verified={selected.verified}
-              hasGeometry={Boolean(selected.latitude !== null && selected.longitude !== null)}
+              hasGeometry={isNavigableDestination(selected, number)}
+              hasCoordinates={hasValidDestinationCoordinates(selected)}
+              coordinatesVerified={selected.coordinatesVerified ?? false}
+              coordinateType={selected.coordinateType ?? null}
+              coordinateSource={selected.coordinateSource ?? null}
+              coordinateSourceDate={selected.coordinateSourceDate ?? null}
+              numberVerified={selected.numberVerified ?? false}
+              resolvedNumber={selected.resolvedNumber ?? null}
               streetNumber={number}
               probableRadiusMeters={selected.probableRadiusMeters}
               spatialRelationLabel={selected.spatialRelationLabel}

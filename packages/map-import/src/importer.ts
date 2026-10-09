@@ -312,20 +312,16 @@ export async function applyReport(
       const geomJson = JSON.stringify(item.geometry)
       const streetId = item.multivus_street_id!
 
-      // Atualiza a geometria da rua oficial com proveniência e pontuação 100
+      // A aprovação desta importação valida a geometria, não o nome nem os números prediais.
       const updateRes = await client.query<{ id: string; official_name: string }>(
         `UPDATE streets
          SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326),
              geometry_source = 'OpenStreetMap',
              geometry_source_date = to_char(now(), 'YYYY-MM-DD'),
-             geometry_verified = true,
-             verified = true,
-             confidence_score = 100,
-             verified_by = $2,
-             verified_at = now()
-         WHERE id = $3
+             geometry_verified = true
+         WHERE id = $2
          RETURNING id, official_name`,
-        [geomJson, userId ?? null, streetId],
+        [geomJson, streetId],
       )
 
       if (updateRes.rowCount && updateRes.rowCount > 0) {

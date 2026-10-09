@@ -110,6 +110,23 @@ describe('Navegação Turn-by-Turn - Engine (@multivus/map-core)', () => {
     expect(result.announcement).toBe('Vire à direita na Rua São Vicente de Paula')
   })
 
+  it('não avança a manobra antes de percorrer sua posição na geometria da rota', () => {
+    const session = createNavigationSession(dummyRoute, destination)
+    const beforeManeuver: Coord = [-47.52458, -19.30919]
+    const result = updateNavigationProgress(session, beforeManeuver)
+
+    expect(result.session.currentStepIndex).toBe(0)
+  })
+
+  it('atualiza a distância restante com progresso monotônico sobre a rota', () => {
+    const session = createNavigationSession(dummyRoute, destination)
+    const first = updateNavigationProgress(session, [-47.525, -19.3095])
+    const second = updateNavigationProgress(first.session, [-47.526, -19.3105])
+
+    expect(second.session.routeProgressMeters).toBeGreaterThan(first.session.routeProgressMeters)
+    expect(second.session.remainingDistance).toBeLessThan(first.session.remainingDistance)
+  })
+
   it('não repete o mesmo anúncio de voz se já foi emitido', () => {
     let session = createNavigationSession(dummyRoute, destination, { voiceEnabled: true })
     // Ponto a ~300m da manobra 1
@@ -134,5 +151,72 @@ describe('Navegação Turn-by-Turn - Engine (@multivus/map-core)', () => {
     expect(result.session.isNavigating).toBe(false)
     expect(result.session.status).toBe('arrived')
     expect(result.announcement).toBe('Você chegou ao destino.')
+  })
+
+  it('não declara chegada quando a precisão do GPS é insuficiente', () => {
+    const session = createNavigationSession(dummyRoute, destination)
+    const result = updateNavigationProgress(
+      session,
+      [-47.52701, -19.31151],
+      { positionAccuracyMeters: 45 },
+    )
+
+    expect(result.session.isArrived).toBe(false)
+    expect(result.session.isNavigating).toBe(true)
+  })
+
+  it('permite atualizar a rota recalculada após desvio preservando o destino original', () => {
+    const session = createNavigationSession(dummyRoute, destination)
+    const offRoute = updateNavigationProgress(session, [-47.520, -19.305])
+    expect(offRoute.session.isOffRoute).toBe(true)
+
+    // Simulando nova rota gerada pelo motor OSRM após o desvio
+    const recalculatedRoute: RouteCalculationResult = {
+      ...dummyRoute,
+      distance: 900,
+      duration: 130,
+      steps: [
+        {
+          instruction: 'Siga na Rua Nova em direção ao destino',
+          distance: 500,
+          duration: 70,
+          location: [-47.520, -19.305],
+        },
+        dummyRoute.steps[2]!,
+      ],
+    }
+
+    const updatedSession = {
+      ...offRoute.session,
+      activeRoute: recalculatedRoute,
+      currentStepIndex: 0,
+      remainingDistance: recalculatedRoute.distance,
+      remainingDuration: recalculatedRoute.duration,
+      currentInstruction: recalculatedRoute.steps[0]!.instruction,
+      isOffRoute: false,
+      status: 'navigating' as const,
+      statusMessage: 'Rota recalculada',
+    }
+
+    expect(updatedSession.isOffRoute).toBe(false)
+    expect(updatedSession.destination.title).toBe(destination.title)
+    expect(updatedSession.currentInstruction).toBe('Siga na Rua Nova em direção ao destino')
+    expect(updatedSession.status).toBe('navigating')
+  })
+
+  it('preserva a rota carregada e orientações caso a internet caia durante navegação ativa', () => {
+    const session = createNavigationSession(dummyRoute, destination)
+    // Internet caiu no cliente
+    const offlineSession = {
+      ...session,
+      statusMessage: 'Sem conexão. Mantendo a rota carregada.',
+    }
+
+    // Mesmo sem internet, o GPS continua avançando sobre a geometria em memória
+    const progress = updateNavigationProgress(offlineSession, [-47.525, -19.3095])
+    expect(progress.session.isNavigating).toBe(true)
+    expect(progress.session.currentStepIndex).toBe(1)
+    expect(progress.session.currentInstruction).toBe('Vire à direita na Rua São Vicente de Paula')
+    expect(progress.session.activeRoute.geometry?.coordinates).toHaveLength(4)
   })
 })

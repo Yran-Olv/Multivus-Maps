@@ -259,6 +259,12 @@ export type SearchResult = {
   sourceDate: string | null
   latitude: number | null
   longitude: number | null
+  number?: string | null
+  coordinatesVerified?: boolean
+  coordinateType?: 'address-point' | 'landmark' | 'place' | 'street' | 'street-access' | 'estimated' | null
+  coordinateSource?: string | null
+  coordinateSourceDate?: string | null
+  numberVerified?: boolean
   geometry: unknown | null
   warning: string | null
   usedOldName: boolean
@@ -275,3 +281,33 @@ export type SearchResult = {
   probableRadiusMeters?: number | null
 }
 
+export type SavedDestination = {
+  id: string
+  kind: 'street' | 'place' | 'landmark' | 'reference' | 'neighborhood'
+  title: string
+  neighborhoodName: string | null
+  oldNames: string[]
+  usedOldName: boolean
+  warning: string | null
+  confidence: number
+  customerInput: string | null
+  matchedAlias: string | null
+  reference: string | null
+  source: string | null
+  sourceDate: string | null
+  verified: boolean
+  latitude: number | null
+  longitude: number | null
+  resolvedNumber?: string | null
+  coordinatesVerified?: boolean
+  coordinateType?: 'address-point' | 'landmark' | 'place' | 'street' | 'street-access' | 'estimated' | null
+  coordinateSource?: string | null
+  coordinateSourceDate?: string | null
+  numberVerified?: boolean
+  targetStreetName?: string | null
+  landmarkName?: string | null
+  probableRadiusMeters?: number | null
+  spatialRelationLabel?: string | null
+  importanceScore?: number | null
+  category?: string | null
+}

@@ -57,6 +57,35 @@ describe('pesquisa com aliases do mapa oficial', () => {
     const [hit] = searchRecords(records(), 'girasois')
     expect(hit?.title).toBe('Rua Elmar Goulart de Andrade')
   })
+
+  it('prioriza a relação comercial exata e não retorna as relações vizinhas como a mesma referência', () => {
+    const business: SearchableRecord = {
+      id: 'barbosao',
+      kind: 'landmark',
+      title: 'Barbosão Supermercado',
+      verified: true,
+      aliases: [{ alias: 'Barbosão', aliasType: 'POPULAR_NAME' }],
+    }
+    const behind: SearchableRecord = {
+      id: 'behind-barbosao',
+      kind: 'reference',
+      title: 'Atrás do Barbosão',
+      verified: true,
+      targetStreetId: 'street-1',
+      targetStreetName: 'Rua de Trás',
+    }
+    const recordsWithDuplicateEntity = [
+      business,
+      behind,
+      { ...behind, aliases: [{ alias: 'Atrás Barbosão', aliasType: 'POPULAR_NAME' }] },
+      { ...behind, id: 'near-barbosao', title: 'Perto do Barbosão' },
+    ]
+    const hits = searchRecords(recordsWithDuplicateEntity, 'Atrás do Barbosão')
+
+    expect(hits[0]).toMatchObject({ kind: 'reference', title: 'Atrás do Barbosão' })
+    expect(hits.filter((hit) => hit.id === 'behind-barbosao')).toHaveLength(1)
+    expect(hits.some((hit) => hit.id === 'near-barbosao')).toBe(false)
+  })
 })
 
 describe('seed de Santa Juliana', () => {

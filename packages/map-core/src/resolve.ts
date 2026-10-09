@@ -119,7 +119,7 @@ export function resolveAddress(records: SearchableRecord[], raw: string): Addres
     }
     if (!resolvedStreetHit) resolvedStreetHit = topHit
   }
-  // 3. Se o topHit for um comércio / ponto de referência direto (ex: "Barbosão Supermercado", "Posto 2000")
+  // 3. Um ponto comercial continua sendo um landmark, mesmo quando tem endereço associado.
   else if (topHit?.kind === 'landmark') {
     matchedLandmark = topHit.title
     matchedLandmarkCategory = topHit.category ?? null
@@ -130,23 +130,7 @@ export function resolveAddress(records: SearchableRecord[], raw: string): Addres
       spatialRelationLabel = 'Perto de (raio provável: 200 metros)'
     }
 
-    if (topHit.targetStreetId) {
-      const street = records.find((r) => r.id === topHit.targetStreetId && r.kind === 'street')
-      if (street) {
-        const [streetRanked] = searchRecords([street], street.title, 1)
-        resolvedStreetHit = streetRanked
-          ? {
-              ...streetRanked,
-              // Preserva a coordenada do landmark se existir para o GPS ir direto ao ponto
-              latitude: topHit.latitude ?? streetRanked.latitude,
-              longitude: topHit.longitude ?? streetRanked.longitude,
-            }
-          : null
-      }
-    }
-    if (!resolvedStreetHit) {
-      resolvedStreetHit = topHit
-    }
+    resolvedStreetHit = topHit
   } else if (topHit?.kind === 'street') {
     resolvedStreetHit = topHit
   } else if (topHit) {
@@ -198,27 +182,6 @@ export function resolveAddress(records: SearchableRecord[], raw: string): Addres
     spatialRelationLabel = 'Perto de (raio provável: 200 metros)'
   }
 
-  // 6. Se não havia resolvido a via mas encontrou um landmark com rua associada
-  if ((!resolvedStreetHit || resolvedStreetHit.kind !== 'street') && matchedLandmark) {
-    const lmRecord = allLandmarks.find((l) => l.title === matchedLandmark)
-    if (lmRecord?.targetStreetId) {
-      const street = records.find((r) => r.id === lmRecord.targetStreetId && r.kind === 'street')
-      if (street) {
-        const [streetRanked] = searchRecords([street], street.title, 1)
-        if (streetRanked) {
-          resolvedStreetHit = {
-            ...streetRanked,
-            latitude: lmRecord.latitude ?? streetRanked.latitude,
-            longitude: lmRecord.longitude ?? streetRanked.longitude,
-          }
-        }
-      }
-    } else if (lmRecord && !resolvedStreetHit) {
-      const [lmRanked] = searchRecords([lmRecord], lmRecord.title, 1)
-      resolvedStreetHit = lmRanked ?? null
-    }
-  }
-
   const officialName = resolvedStreetHit?.title ?? matchedLandmark ?? null
   const oldNames = resolvedStreetHit?.oldNames ?? []
 
@@ -228,6 +191,8 @@ export function resolveAddress(records: SearchableRecord[], raw: string): Addres
   } else if (matchedLandmark && resolvedStreetHit?.kind === 'street') {
     const extraInfo = additionalLandmarks.length ? ` (outros pontos próximos: ${additionalLandmarks.slice(0, 2).join(', ')})` : ''
     warning = `Ponto de referência: ${matchedLandmark}${extraInfo}. ${spatialRelationLabel ?? 'Raio estimado de entrega.'}`
+  } else if (resolvedStreetHit?.kind === 'landmark') {
+    warning = `Ponto comercial identificado: ${resolvedStreetHit.title}. Confirme a localização exata e o endereço associado antes de navegar.`
   } else if (resolvedStreetHit?.warning) {
     warning = resolvedStreetHit.warning
   }

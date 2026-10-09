@@ -160,8 +160,39 @@ export function AdminMapPage() {
   const [selectedStreetId, setSelectedStreetId] = useState<string>('')
   const [osmFilter, setOsmFilter] = useState<string>('ALL')
   const [searchTerm, setSearchTerm] = useState('')
+  const [streetFilter, setStreetFilter] = useState<'ALL' | 'WITHOUT_GEOM' | 'WITH_GEOM' | 'WITHOUT_NEIGHBORHOOD'>('ALL')
+  const [streetSearchTerm, setStreetSearchTerm] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  const summary = useMemo(() => {
+    const allStreets = streets.data?.streets ?? []
+    const allOsm = osmRecords.data?.records ?? []
+    return {
+      totalStreets: allStreets.length,
+      withGeometry: allStreets.filter((s) => s.geometryVerified || s.geometry).length,
+      withoutGeometry: allStreets.filter((s) => !s.geometryVerified && !s.geometry).length,
+      withoutNeighborhood: allStreets.filter((s) => !s.neighborhoodName || s.neighborhoodStatus !== 'CONFIRMED').length,
+      osmPending: allOsm.filter((r) => r.status === 'PENDING').length,
+      osmApproved: allOsm.filter((r) => r.status === 'APPROVED').length,
+      osmConflicts: allOsm.filter((r) => r.matchType === 'CONFLICT' || r.status === 'CONFLICT').length,
+    }
+  }, [streets.data?.streets, osmRecords.data?.records])
+
+  const filteredStreets = useMemo(() => {
+    return (streets.data?.streets ?? []).filter((s) => {
+      if (streetFilter === 'WITHOUT_GEOM' && (s.geometryVerified || s.geometry)) return false
+      if (streetFilter === 'WITH_GEOM' && !s.geometryVerified && !s.geometry) return false
+      if (streetFilter === 'WITHOUT_NEIGHBORHOOD' && s.neighborhoodName && s.neighborhoodStatus === 'CONFIRMED') return false
+      if (streetSearchTerm.trim()) {
+        const term = streetSearchTerm.toLowerCase()
+        if (!s.officialName.toLowerCase().includes(term) && !(s.neighborhoodName ?? '').toLowerCase().includes(term)) {
+          return false
+        }
+      }
+      return true
+    })
+  }, [streets.data?.streets, streetFilter, streetSearchTerm])
 
   // Ações de merge e criação
   const [mergeTargetId, setMergeTargetId] = useState('')
@@ -481,37 +512,63 @@ export function AdminMapPage() {
   return (
     <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_minmax(0,1.4fr)] bg-[#0e141b] text-white">
       {/* Cabeçalho */}
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-2.5 bg-[#12181f]">
-        <div className="flex items-center gap-3">
-          <Link to="/admin" className="text-sm font-medium text-amber-300 hover:underline">
-            ← Painel
-          </Link>
-          <span className="text-slate-500">|</span>
-          <h1 className="text-base font-semibold">Conferência Cartográfica & Mapa</h1>
+      <header className="flex flex-col border-b border-white/10 bg-[#12181f]">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <Link to="/admin" className="text-sm font-medium text-amber-300 hover:underline">
+              ← Painel
+            </Link>
+            <span className="text-slate-500">|</span>
+            <h1 className="text-base font-semibold">Conferência Cartográfica & Mapa</h1>
+          </div>
+
+          {/* Camadas do Mapa */}
+          <div className="flex items-center gap-3 text-xs">
+            <label className="flex items-center gap-1.5 cursor-pointer rounded-lg bg-black/30 px-2.5 py-1.5 border border-white/10">
+              <input
+                type="checkbox"
+                checked={showMultivus}
+                onChange={(e) => setShowMultivus(e.target.checked)}
+                className="accent-amber-400"
+              />
+              <span className="font-semibold text-amber-300">MULTIVUS</span>
+              <span className="text-slate-400">({streets.data?.streets.length ?? 0})</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer rounded-lg bg-black/30 px-2.5 py-1.5 border border-white/10">
+              <input
+                type="checkbox"
+                checked={showOsm}
+                onChange={(e) => setShowOsm(e.target.checked)}
+                className="accent-purple-400"
+              />
+              <span className="font-semibold text-purple-300">OSM (Base)</span>
+              <span className="text-slate-400">({osmRecords.data?.records.length ?? 0})</span>
+            </label>
+          </div>
         </div>
 
-        {/* Camadas do Mapa */}
-        <div className="flex items-center gap-3 text-xs">
-          <label className="flex items-center gap-1.5 cursor-pointer rounded-lg bg-black/30 px-2.5 py-1.5 border border-white/10">
-            <input
-              type="checkbox"
-              checked={showMultivus}
-              onChange={(e) => setShowMultivus(e.target.checked)}
-              className="accent-amber-400"
-            />
-            <span className="font-semibold text-amber-300">MULTIVUS</span>
-            <span className="text-slate-400">({streets.data?.streets.length ?? 0})</span>
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer rounded-lg bg-black/30 px-2.5 py-1.5 border border-white/10">
-            <input
-              type="checkbox"
-              checked={showOsm}
-              onChange={(e) => setShowOsm(e.target.checked)}
-              className="accent-purple-400"
-            />
-            <span className="font-semibold text-purple-300">OSM (Base)</span>
-            <span className="text-slate-400">({osmRecords.data?.records.length ?? 0})</span>
-          </label>
+        {/* Barra de Auditoria de Indicadores da Malha Viária */}
+        <div className="grid grid-cols-2 gap-2 border-t border-white/5 bg-black/25 px-4 py-2 text-[11px] sm:grid-cols-5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400">OSM Pendentes:</span>
+            <span className="font-bold text-purple-300">{summary.osmPending}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400">Aprovadas:</span>
+            <span className="font-bold text-emerald-300">{summary.osmApproved}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400">Conflitos:</span>
+            <span className={`font-bold ${summary.osmConflicts > 0 ? 'text-red-400' : 'text-slate-300'}`}>{summary.osmConflicts}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400">Sem Geometria:</span>
+            <span className={`font-bold ${summary.withoutGeometry > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{summary.withoutGeometry}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400">Sem Bairro:</span>
+            <span className="font-bold text-amber-300">{summary.withoutNeighborhood}</span>
+          </div>
         </div>
       </header>
 
@@ -877,16 +934,33 @@ export function AdminMapPage() {
           {/* ABA 2: RUAS MULTIVUS */}
           {activeTab === 'streets' && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase text-slate-400">
-                  Total de Ruas: {streets.data?.streets.length ?? 0}
-                </span>
-                <span className="text-xs text-emerald-400">
-                  Verificadas: {streets.data?.streets.filter((s) => s.geometryVerified).length ?? 0}
-                </span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-1 gap-2">
+                  <input
+                    value={streetSearchTerm}
+                    onChange={(e) => setStreetSearchTerm(e.target.value)}
+                    placeholder="Buscar rua por nome ou bairro..."
+                    className="h-10 flex-1 rounded-xl bg-[#1c242c] px-3 text-xs outline-none border border-white/5"
+                  />
+                  <select
+                    value={streetFilter}
+                    onChange={(e) => setStreetFilter(e.target.value as typeof streetFilter)}
+                    className="h-10 rounded-xl bg-[#1c242c] px-3 text-xs outline-none border border-white/5"
+                  >
+                    <option value="ALL">Todas as ruas ({summary.totalStreets})</option>
+                    <option value="WITHOUT_GEOM">Sem geometria ({summary.withoutGeometry})</option>
+                    <option value="WITH_GEOM">Com geometria ({summary.withGeometry})</option>
+                    <option value="WITHOUT_NEIGHBORHOOD">Sem bairro confirmado ({summary.withoutNeighborhood})</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-slate-400">Exibindo: <strong className="text-white">{filteredStreets.length}</strong></span>
+                  <span className="text-emerald-400">Verificadas: <strong>{summary.withGeometry}</strong></span>
+                </div>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {(streets.data?.streets ?? []).map((street) => (
+                {filteredStreets.map((street) => (
                   <button
                     key={street.id}
                     type="button"
@@ -906,8 +980,14 @@ export function AdminMapPage() {
                     <div className="mt-1 text-slate-400 text-[11px]">
                       Bairro: {street.neighborhoodName || 'Não confirmado'}
                     </div>
+                    <div className="mt-0.5 text-slate-500 text-[10px]">
+                      Fonte: {street.source || 'Prefeitura Santa Juliana'} ({street.sourceDate || '2021'})
+                    </div>
                   </button>
                 ))}
+                {filteredStreets.length === 0 ? (
+                  <p className="col-span-full p-4 text-center text-xs text-slate-400">Nenhuma rua encontrada com esse filtro.</p>
+                ) : null}
               </div>
             </div>
           )}

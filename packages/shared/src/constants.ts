@@ -1,6 +1,6 @@
-export const APP_VERSION = '1.2.0'
-export const APP_BUILD_DATE = '2026-10-06'
-export const APP_BUILD_ID = '20261006.1'
+export const APP_VERSION = '1.3.0'
+export const APP_BUILD_DATE = '2026-10-09'
+export const APP_BUILD_ID = '20261009.1'
 
 export const ROLES = ['ADMIN', 'EDITOR', 'DELIVERY_DRIVER', 'USER'] as const
 export type Role = (typeof ROLES)[number]
@@ -155,3 +155,37 @@ export const ACTIONS = [
   'favorite:write',
 ] as const
 export type Action = (typeof ACTIONS)[number]
+
+/** ==== Navegação e câmera ==== */
+
+/** Zoom inicial ao iniciar a navegação, antes de acompanhar o GPS. */
+export const STARTING_ZOOM = 15
+
+/** Zoom comum na navegação (estável e confortável). */
+export const NAVIGATION_ZOOM = 15
+
+/** Zoom mínimo autorizado para o método de acompanhamento. */
+export const CAMERA_MIN_ZOOM = 12
+
+/** Zoom máximo autorizado para o método de acompanhamento. */
+export const CAMERA_MAX_ZOOM = 19
+
+/**
+ * Fator de suavização para a câmera durante o acompanhamento GPS.
+ * Menor valor = movimento mais suave e previsível.
+ */
+export const CAMERA_FOLLOW_EASING = 0.18
+
+/**
+ * Tolerância de entrada do GPS antes de reavaliar o movimento da câmera.
+ * Serve para ignorar pequenas oscilações que não justificam animação.
+ */
+export const CAMERA_GPS_TOLERANCE_MEDIUM = 6
+
+/**
+ * Tolerância de entrada do GPS para despachar animação de grande deslocamento.
+ */
+export const CAMERA_GPS_TOLERANCE_LARGE = 55
+
+/** Distância mínima em metros entre destino e rua receptor para tratar o destino como estimado. */
+export const MAX_FINAL_POINT_DISTANCE_FROM_ROAD_M = 28

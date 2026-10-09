@@ -227,6 +227,10 @@ describe('entender endereço', () => {
     expect(resBarbosao.probableRadiusMeters).toBe(200)
     expect(resBarbosao.spatialRelation).toBe('NEAR')
 
+    const directCommerce = resolveAddress(intelligenceRecords, 'Barbosão')
+    expect(directCommerce.hit?.kind).toBe('landmark')
+    expect(directCommerce.officialName).toBe('Barbosão Supermercado - Santa Juliana MG')
+
     // Caso 2: "atrás da Farma Cunha" -> Localiza a farmácia primeiro, raio provável de 100m
     const resCunha = resolveAddress(intelligenceRecords, 'atrás da Farma Cunha')
     expect(resCunha.matchedLandmark).toBe('Farma Cunha')
@@ -251,4 +255,3 @@ describe('entender endereço', () => {
     expect(resComplex.additionalLandmarks.length).toBeGreaterThanOrEqual(2)
   })
 })
-

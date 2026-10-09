@@ -2,6 +2,12 @@ import type { ReactNode } from 'react'
 
 export type AddressHit = {
   id: string
+  entityId?: string
+  entityKind?: 'street' | 'place' | 'landmark' | 'reference' | 'neighborhood'
+  number?: string | null
+  customerInput?: string | null
+  query?: string | null
+  destination?: import('@multivus/shared').SavedDestination
   title: string
   subtitle?: string | null
   warning?: string | null
@@ -12,6 +18,16 @@ export type AddressHit = {
   neighborhoodName?: string | null
   confidence?: number
   verified?: boolean
+  latitude?: number | null
+  longitude?: number | null
+  resolvedNumber?: string | null
+  coordinatesVerified?: boolean
+  coordinateType?: import('@multivus/shared').SavedDestination['coordinateType']
+  coordinateSource?: string | null
+  coordinateSourceDate?: string | null
+  numberVerified?: boolean
+  source?: string | null
+  sourceDate?: string | null
 }
 
 type AddressSearchProps = {

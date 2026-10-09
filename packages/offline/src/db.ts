@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie'
+import type { SavedDestination } from '@multivus/shared'
 
 export type LocalAlias = {
   alias: string
@@ -39,6 +40,10 @@ export type LocalFavorite = {
   label: string
   streetId: string | null
   placeId: string | null
+  entityId?: string
+  entityKind?: SavedDestination['kind']
+  number?: string | null
+  destination?: SavedDestination
   customerInput?: string | null
   matchedAlias?: string | null
   createdAt: string
@@ -50,6 +55,12 @@ export type LocalRecent = {
   query: string
   title: string
   streetId: string | null
+  entityId?: string
+  entityKind?: SavedDestination['kind']
+  number?: string | null
+  destination?: SavedDestination
+  customerInput?: string | null
+  matchedAlias?: string | null
   createdAt: string
 }
 
@@ -131,10 +142,20 @@ export class MultivusDB extends Dexie {
       syncQueue: '++id, clientId, operation, createdAt',
       kv: 'key',
     })
+    this.version(3).stores({
+      streets: 'id, officialName, verified',
+      places: 'id, name, category',
+      landmarks: 'id, name, category, streetId',
+      localReferences: 'id, popularPhrase, targetStreetId, landmarkId',
+      neighborhoods: 'id, name',
+      favorites: 'id, createdAt',
+      recents: 'id, createdAt',
+      syncQueue: '++id, clientId, operation, createdAt',
+      kv: 'key',
+    })
   }
 }
 
 export function createDatabase(name?: string): MultivusDB {
   return new MultivusDB(name)
 }
-

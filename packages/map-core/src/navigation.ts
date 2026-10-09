@@ -16,6 +16,7 @@ export type NavigationSession = {
   isNavigating: boolean
   activeRoute: RouteCalculationResult
   currentStepIndex: number
+  routeProgressMeters: number
   startedAt: string
   destination: NavigationDestination
   remainingDistance: number // em metros
@@ -139,6 +140,7 @@ export function createNavigationSession(
     isNavigating: true,
     activeRoute,
     currentStepIndex: 0,
+    routeProgressMeters: 0,
     startedAt: new Date().toISOString(),
     destination,
     remainingDistance: activeRoute.distance,
@@ -175,6 +177,7 @@ export function updateNavigationProgress(
     arrivalThreshold?: number
     offTrackThreshold?: number
     stepAdvanceThreshold?: number
+    positionAccuracyMeters?: number | null
   },
 ): ProgressUpdateResult {
   if (!session.isNavigating || session.isArrived) {
@@ -184,12 +187,13 @@ export function updateNavigationProgress(
   const arrivalThreshold = options?.arrivalThreshold ?? ARRIVAL_THRESHOLD_METERS
   const offTrackThreshold = options?.offTrackThreshold ?? ROUTE_OFF_TRACK_THRESHOLD_METERS
   const stepAdvanceThreshold = options?.stepAdvanceThreshold ?? STEP_ADVANCE_THRESHOLD_METERS
+  const positionAccuracy = options?.positionAccuracyMeters ?? null
 
   const destCoord: Coord = [session.destination.longitude, session.destination.latitude]
   const distToDest = haversineDistance(userCoord, destCoord)
 
   // 1. Chegada ao destino
-  if (distToDest <= arrivalThreshold) {
+  if (distToDest <= arrivalThreshold && (positionAccuracy === null || positionAccuracy <= 20)) {
     const arrivedAnnouncement = 'Você chegou ao destino.'
     return {
       session: {
@@ -210,8 +214,17 @@ export function updateNavigationProgress(
 
   // 2. Detecção de desvio de rota (Off-track)
   const routeCoords = session.activeRoute.geometry?.coordinates ?? []
-  const distToRoute = distanceToRouteLine(userCoord, routeCoords)
-  const isOffRoute = distToRoute > offTrackThreshold
+  const projection = projectOnRoute(
+    userCoord,
+    routeCoords,
+    Math.max(-10, session.routeProgressMeters - 12),
+  )
+  const routeProgressMeters = Math.max(session.routeProgressMeters, projection.alongRoute)
+  const effectiveOffTrackThreshold = Math.max(
+    offTrackThreshold,
+    Math.min(positionAccuracy ?? 0, 80),
+  )
+  const isOffRoute = projection.distance > effectiveOffTrackThreshold
 
   if (isOffRoute) {
     return {
@@ -229,33 +242,23 @@ export function updateNavigationProgress(
   let stepIndex = session.currentStepIndex
   let currentStep = steps[stepIndex]
 
-  // Próximo ponto de manobra
-  let targetManeuverCoord: Coord | null = null
-  if (stepIndex + 1 < steps.length && steps[stepIndex + 1]?.location) {
-    targetManeuverCoord = steps[stepIndex + 1]!.location!
-  } else if (currentStep?.location) {
-    targetManeuverCoord = currentStep.location
-  } else {
-    targetManeuverCoord = destCoord
-  }
-
-  let distToManeuver = haversineDistance(userCoord, targetManeuverCoord)
-
-  // Avanço de step quando cruzar o ponto da manobra
   let advancedStep = false
-  if (distToManeuver <= stepAdvanceThreshold && stepIndex < steps.length - 1) {
+  while (stepIndex < steps.length - 1) {
+    const maneuver = steps[stepIndex + 1]
+    const maneuverLocation = maneuver?.location
+    if (!maneuverLocation) break
+    const maneuverProgress = projectOnRoute(maneuverLocation, routeCoords).alongRoute
+    const distanceToManeuver = haversineDistance(userCoord, maneuverLocation)
+    const hasPassedManeuver = routeProgressMeters >= maneuverProgress
+    if (!hasPassedManeuver && distanceToManeuver > stepAdvanceThreshold) break
+    if (!hasPassedManeuver) break
     stepIndex++
     currentStep = steps[stepIndex]
     advancedStep = true
-
-    // Atualiza próximo ponto
-    if (stepIndex + 1 < steps.length && steps[stepIndex + 1]?.location) {
-      targetManeuverCoord = steps[stepIndex + 1]!.location!
-    } else {
-      targetManeuverCoord = destCoord
-    }
-    distToManeuver = haversineDistance(userCoord, targetManeuverCoord)
   }
+
+  const nextManeuver = steps[stepIndex + 1]?.location ?? destCoord
+  const distToManeuver = haversineDistance(userCoord, nextManeuver)
 
   // Atualiza instruções
   const currentInstruction = currentStep?.instruction || 'Siga em frente'
@@ -263,12 +266,13 @@ export function updateNavigationProgress(
   const nextInstruction = nextStep ? formatNextStepInstruction(nextStep) : undefined
 
   // Recalcula distância e duração restante aproximadas
-  let remainingDistance = Math.round(distToManeuver)
-  for (let i = stepIndex + 1; i < steps.length; i++) {
-    remainingDistance += steps[i]!.distance
-  }
-  // Estima duração com base em velocidade média urbana de 30 km/h (~8.3 m/s) ou duração proporcional
-  const remainingDuration = Math.max(1, Math.round(remainingDistance / 8.3))
+  const remainingDistance = Math.max(
+    0,
+    Math.round(session.activeRoute.distance - routeProgressMeters),
+  )
+  const remainingDuration = session.activeRoute.distance > 0
+    ? Math.max(1, Math.round(session.activeRoute.duration * (remainingDistance / session.activeRoute.distance)))
+    : 0
 
   // 4. Determina avisos de voz
   let announcement: string | undefined
@@ -306,6 +310,7 @@ export function updateNavigationProgress(
     session: {
       ...session,
       currentStepIndex: stepIndex,
+      routeProgressMeters,
       remainingDistance,
       remainingDuration,
       currentInstruction,
@@ -318,4 +323,47 @@ export function updateNavigationProgress(
     },
     announcement,
   }
+}
+
+function projectOnRoute(
+  point: Coord,
+  route: Coord[],
+  minimumProgress = Number.NEGATIVE_INFINITY,
+): { distance: number; alongRoute: number } {
+  if (route.length === 0) return { distance: Infinity, alongRoute: 0 }
+  if (route.length === 1) {
+    return { distance: haversineDistance(point, route[0]!), alongRoute: 0 }
+  }
+
+  let travelled = 0
+  let best = { distance: Infinity, alongRoute: 0 }
+  let fallback = best
+  for (let index = 0; index < route.length - 1; index += 1) {
+    const start = route[index]!
+    const end = route[index + 1]!
+    const segmentLength = haversineDistance(start, end)
+    const meanLatitude = ((start[1] + end[1]) / 2) * (Math.PI / 180)
+    const xScale = Math.cos(meanLatitude) * 111_320
+    const yScale = 110_540
+    const dx = (end[0] - start[0]) * xScale
+    const dy = (end[1] - start[1]) * yScale
+    const px = (point[0] - start[0]) * xScale
+    const py = (point[1] - start[1]) * yScale
+    const squaredLength = dx * dx + dy * dy
+    const fraction = squaredLength === 0
+      ? 0
+      : Math.max(0, Math.min(1, (px * dx + py * dy) / squaredLength))
+    const projected: Coord = [
+      start[0] + fraction * (end[0] - start[0]),
+      start[1] + fraction * (end[1] - start[1]),
+    ]
+    const candidate = {
+      distance: haversineDistance(point, projected),
+      alongRoute: travelled + fraction * segmentLength,
+    }
+    if (candidate.distance < fallback.distance) fallback = candidate
+    if (candidate.alongRoute >= minimumProgress && candidate.distance < best.distance) best = candidate
+    travelled += segmentLength
+  }
+  return Number.isFinite(best.distance) ? best : fallback
 }
