@@ -1,5 +1,6 @@
 FROM node:22-alpine AS build
 RUN corepack enable
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY apps/api/package.json apps/api/package.json
