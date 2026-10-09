@@ -56,15 +56,16 @@ export function parseAddressText(raw: string): ParsedAddress {
   }
 
   const NON_STREET_NUMBER_PREFIXES = /\b(?:posto|auto\s+posto|loja|supermercado|farma|drogaria|farm[aá]cia|padaria|box|bloco|quadra|lote|br|km)\b/i
+  const NUMBER_PREFIX_PATTERN = /\s*(?:,\s*)?(?:n[úu]mero|n[º°]|num\.?|n\.?)\s*$/i
 
-  const trailingNumber = streetChunk.match(/^(.*?\D)\s+(\d{1,5}[a-zA-Z]?)(?:\s+(.*))?$/)
+  const trailingNumber = streetChunk.match(/^(.*?\D)(?:\s*(?:,\s*)?(?:n[úu]mero|n[º°]|num\.?|n\.?))?\s+(\d{1,5}[a-zA-Z]?)(?:\s+(.*))?$/i)
   if (
     trailingNumber?.[1] &&
     trailingNumber[2] &&
     normalizeAddress(trailingNumber[1]).length >= 2 &&
     !NON_STREET_NUMBER_PREFIXES.test(trailingNumber[1].trim())
   ) {
-    streetChunk = trailingNumber[1].trim()
+    streetChunk = trailingNumber[1].replace(NUMBER_PREFIX_PATTERN, '').trim()
     number = trailingNumber[2]
     if (trailingNumber[3]?.trim()) {
       references.push(trailingNumber[3].trim())
@@ -72,12 +73,19 @@ export function parseAddressText(raw: string): ParsedAddress {
   }
 
   for (const chunk of chunks.slice(1)) {
+    const chunkNumberMatch = chunk.match(/^(?:n[úu]mero|n[º°]|num\.?|n\.?)\s*(\d{1,5}[a-zA-Z]?)$/i)
+    if (!number && chunkNumberMatch?.[1]) {
+      number = chunkNumberMatch[1]
+      continue
+    }
     if (!number && /^\d{1,5}[a-zA-Z]?$/.test(chunk)) {
       number = chunk
       continue
     }
     references.push(chunk)
   }
+
+  streetChunk = streetChunk.replace(NUMBER_PREFIX_PATTERN, '').trim()
 
   return {
     raw: original,

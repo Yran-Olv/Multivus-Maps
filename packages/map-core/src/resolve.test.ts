@@ -59,6 +59,24 @@ describe('entender endereço', () => {
     expect(resolveAddress(records(), 'Rua Lírios, 120').number).toBe('120')
   })
 
+  it('entende mensagem do WhatsApp com indicador número e bairro: "Rua dos jasmins número 110 bairro primavera"', () => {
+    const resolved = resolveAddress(records(), 'Rua dos jasmins número 110 bairro primavera')
+    expect(resolved.officialName).toBe('Rua Adelaide Maria Ribeiro do Prado')
+    expect(resolved.number).toBe('110')
+    expect(resolved.usedOldName).toBe(true)
+    expect(resolved.matchedAlias?.toLowerCase()).toContain('jasmin')
+  })
+
+  it('entende variações com "nº 110" e "n 110"', () => {
+    const resNo = resolveAddress(records(), 'Rua dos Jasmins nº 110')
+    expect(resNo.officialName).toBe('Rua Adelaide Maria Ribeiro do Prado')
+    expect(resNo.number).toBe('110')
+
+    const resN = resolveAddress(records(), 'Rua dos jasmins n 110')
+    expect(resN.officialName).toBe('Rua Adelaide Maria Ribeiro do Prado')
+    expect(resN.number).toBe('110')
+  })
+
   it('mostra o nome antigo quando a busca usa o nome atual', () => {
     const resolved = resolveAddress(records(), 'Orivaldo José Pires')
     expect(resolved.officialName).toBe('Rua Orivaldo José Pires')

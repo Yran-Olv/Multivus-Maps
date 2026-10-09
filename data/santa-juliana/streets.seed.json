@@ -329,7 +329,19 @@
       "geometry": null,
       "aliases": [
         {
+          "alias": "Rua dos Jasmins",
+          "aliasType": "OLD_NAME"
+        },
+        {
+          "alias": "Rua Jasmins",
+          "aliasType": "OLD_NAME"
+        },
+        {
           "alias": "Jasmins",
+          "aliasType": "OLD_NAME"
+        },
+        {
+          "alias": "dos Jasmins",
           "aliasType": "OLD_NAME"
         }
       ]

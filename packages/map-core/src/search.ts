@@ -117,8 +117,10 @@ function scoreText(query: string, candidate: string): number {
   if (!candidate) return 0
   if (candidate === query) return 100
   if (candidate.startsWith(query)) return 84
+  if (query.startsWith(candidate) && candidate.length >= 4) return 84
   const covered = tokenScore(query, candidate)
   if (candidate.includes(query)) return Math.max(74, covered)
+  if (query.includes(candidate) && candidate.length >= 4) return Math.max(74, covered)
   if (covered) return covered
   const distance = levenshtein(query, candidate)
   const limit = query.length <= 5 ? 1 : 2
@@ -131,9 +133,13 @@ function scoreText(query: string, candidate: string): number {
 }
 
 function tokenScore(query: string, candidate: string): number {
-  const tokens = query.split(' ').filter((token) => token.length >= 3)
-  if (tokens.length < 2) return 0
-  return tokens.every((token) => candidate.includes(token)) ? 78 : 0
+  const queryTokens = query.split(' ').filter((token) => token.length >= 3 && !['dos', 'das', 'com', 'sem'].includes(token))
+  const candidateTokens = candidate.split(' ').filter((token) => token.length >= 3 && !['dos', 'das', 'com', 'sem'].includes(token))
+  if (queryTokens.length === 0 || candidateTokens.length === 0) return 0
+  const allQueryInCandidate = queryTokens.length >= 2 && queryTokens.every((token) => candidate.includes(token))
+  const allCandidateInQuery = candidateTokens.length >= 1 && candidateTokens.every((token) => query.includes(token))
+  if (allQueryInCandidate || allCandidateInQuery) return 78
+  return 0
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
