@@ -22,14 +22,14 @@ const geoJsonSchema = z.record(z.unknown()).nullable()
 
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(6),
 })
 
 export const createUserSchema = z.object({
   name: z.string().min(2).max(160),
   email: z.string().email(),
   phone: z.string().min(8).max(20).nullable().optional(),
-  password: z.string().min(8).max(128),
+  password: z.string().min(6).max(128),
   role: roleSchema,
 })
 
