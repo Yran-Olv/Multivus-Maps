@@ -80,6 +80,11 @@ export type ImportReport = {
   sourceFile: string
   generatedAt: string
   summary: ImportReportSummary
+  processing?: {
+    inputFeatures: number
+    outsideBoundary: number
+    clippedAtBoundary: number
+  }
   items: ImportReportItem[]
 }
 

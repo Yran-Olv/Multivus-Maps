@@ -1104,34 +1104,60 @@ export async function approveOsmGeometry(
       }
       sourceName = record.sourceName
       score = record.score
-      await db
-        .update(osmImportRecords)
-        .set({
-          status: 'APPROVED',
-          reviewedBy: userId,
-          reviewedAt: new Date(),
-        })
-        .where(eq(osmImportRecords.id, record.id))
+    } else {
+      throw new Error('Registro de importação OSM não encontrado.')
     }
   }
 
   if (!geom) throw new Error('Geometria não fornecida.')
   const geomStr = JSON.stringify(geom)
+  const geometrySource = input.source ?? 'OpenStreetMap'
 
   await db.execute(sql`
-    UPDATE streets SET
-      geometry = ST_SetSRID(ST_GeomFromGeoJSON(${geomStr}), 4326),
-      geometry_source = ${input.source ?? 'OpenStreetMap'},
+    WITH incoming AS (
+      SELECT ST_SetSRID(ST_GeomFromGeoJSON(${geomStr}), 4326) AS geom
+    ), inserted_segment AS (
+      INSERT INTO street_segments (street_id, geometry, direction, verified, source)
+      SELECT ${input.streetId}, incoming.geom, 'BOTH', false, ${geometrySource}
+      FROM incoming
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM street_segments
+        WHERE street_id = ${input.streetId}
+          AND ST_Equals(geometry, incoming.geom)
+      )
+      RETURNING id
+    )
+    UPDATE streets
+    SET geometry = ST_Multi(ST_CollectionExtract(
+          CASE
+            WHEN streets.geometry IS NULL THEN incoming.geom
+            ELSE ST_UnaryUnion(ST_Collect(streets.geometry, incoming.geom))
+          END,
+          2
+        )),
+      geometry_source = CASE
+        WHEN streets.geometry IS NULL OR streets.geometry_source = ${geometrySource}
+          THEN ${geometrySource}
+        ELSE 'Múltiplas fontes'
+      END,
       geometry_source_date = to_char(now(), 'YYYY-MM-DD'),
       geometry_verified = true
-    WHERE id = ${input.streetId}
+    FROM incoming
+    WHERE streets.id = ${input.streetId}
   `)
 
-  await db.execute(sql`
-    INSERT INTO street_segments (street_id, geometry, direction, verified, source)
-    VALUES (${input.streetId}, ST_SetSRID(ST_GeomFromGeoJSON(${geomStr}), 4326), 'BOTH', false, ${input.source ?? 'OpenStreetMap'})
-    ON CONFLICT DO NOTHING
-  `)
+  if (input.importRecordId) {
+    await db
+      .update(osmImportRecords)
+      .set({
+        multivusStreetId: input.streetId,
+        status: 'APPROVED',
+        reviewedBy: userId,
+        reviewedAt: new Date(),
+      })
+      .where(eq(osmImportRecords.id, input.importRecordId))
+  }
 
   const updated = await getStreet(db, input.streetId)
   await audit(db, {
@@ -1141,7 +1167,7 @@ export async function approveOsmGeometry(
     newData: {
       streetId: input.streetId,
       officialName: updated?.officialName,
-      source: input.source ?? 'OpenStreetMap',
+      source: geometrySource,
       sourceName,
       score,
     },
@@ -1452,6 +1478,8 @@ export async function adminStats(db: Database) {
     pendingCorrections: number
     streets: number
     verifiedStreets: number
+    streetsWithGeometry: number
+    geometryVerifiedStreets: number
     streetsWithoutGeometry: number
     streetsWithoutNeighborhood: number
     streetsWithOldNames: number
@@ -1461,19 +1489,49 @@ export async function adminStats(db: Database) {
     localReferences: number
     aliases: number
     users: number
+    neighborhoodsWithGeometry: number
+    neighborhoodsWithoutGeometry: number
+    addressPoints: number
+    addressPointsWithGeometry: number
+    addressPointsWithoutGeometry: number
+    addressPointsVerified: number
+    placesWithoutCoordinates: number
+    landmarksWithoutCoordinates: number
+    pendingOsmRecords: number
+    conflictingOsmRecords: number
+    unverifiedStreetSegments: number
+    invalidStreetGeometries: number
+    duplicateStreetNames: number
+    duplicateStreetGeometries: number
   }>(sql`
     SELECT
       (SELECT count(*) FROM map_corrections WHERE status = 'PENDING')::int AS "pendingCorrections",
       (SELECT count(*) FROM streets WHERE active)::int AS streets,
       (SELECT count(*) FROM streets WHERE active AND verified)::int AS "verifiedStreets",
+      (SELECT count(*) FROM streets WHERE active AND geometry IS NOT NULL)::int AS "streetsWithGeometry",
+      (SELECT count(*) FROM streets WHERE active AND geometry IS NOT NULL AND geometry_verified)::int AS "geometryVerifiedStreets",
       (SELECT count(*) FROM streets WHERE active AND geometry IS NULL)::int AS "streetsWithoutGeometry",
       (SELECT count(*) FROM streets WHERE active AND (neighborhood_id IS NULL OR neighborhood_status = 'PENDING'))::int AS "streetsWithoutNeighborhood",
       (SELECT count(DISTINCT street_id) FROM street_aliases WHERE alias_type = 'OLD_NAME')::int AS "streetsWithOldNames",
       (SELECT count(*) FROM neighborhoods WHERE active)::int AS neighborhoods,
+      (SELECT count(*) FROM neighborhoods WHERE active AND geometry IS NOT NULL)::int AS "neighborhoodsWithGeometry",
+      (SELECT count(*) FROM neighborhoods WHERE active AND geometry IS NULL)::int AS "neighborhoodsWithoutGeometry",
+      (SELECT count(*) FROM address_points ap JOIN streets s ON s.id = ap.street_id WHERE s.active)::int AS "addressPoints",
+      (SELECT count(*) FROM address_points ap JOIN streets s ON s.id = ap.street_id WHERE s.active AND ap.geometry IS NOT NULL)::int AS "addressPointsWithGeometry",
+      (SELECT count(*) FROM address_points ap JOIN streets s ON s.id = ap.street_id WHERE s.active AND ap.geometry IS NULL)::int AS "addressPointsWithoutGeometry",
+      (SELECT count(*) FROM address_points ap JOIN streets s ON s.id = ap.street_id WHERE s.active AND ap.verified)::int AS "addressPointsVerified",
       (SELECT count(*) FROM places WHERE active)::int AS places,
+      (SELECT count(*) FROM places WHERE active AND (latitude IS NULL OR longitude IS NULL))::int AS "placesWithoutCoordinates",
       (SELECT count(*) FROM landmarks WHERE active)::int AS landmarks,
+      (SELECT count(*) FROM landmarks WHERE active AND (latitude IS NULL OR longitude IS NULL))::int AS "landmarksWithoutCoordinates",
       (SELECT count(*) FROM local_references WHERE active)::int AS "localReferences",
       (SELECT count(*) FROM street_aliases)::int AS aliases,
+      (SELECT count(*) FROM osm_import_records WHERE status = 'PENDING')::int AS "pendingOsmRecords",
+      (SELECT count(*) FROM osm_import_records WHERE status = 'CONFLICT' OR match_type = 'CONFLICT')::int AS "conflictingOsmRecords",
+      (SELECT count(*) FROM street_segments WHERE NOT verified)::int AS "unverifiedStreetSegments",
+      (SELECT count(*) FROM streets WHERE active AND geometry IS NOT NULL AND NOT ST_IsValid(geometry))::int AS "invalidStreetGeometries",
+      (SELECT count(*) FROM (SELECT normalized_name FROM streets WHERE active GROUP BY normalized_name HAVING count(*) > 1) duplicate_names)::int AS "duplicateStreetNames",
+      (SELECT count(*) FROM (SELECT geometry FROM streets WHERE active AND geometry IS NOT NULL GROUP BY geometry HAVING count(*) > 1) duplicate_geometries)::int AS "duplicateStreetGeometries",
       (SELECT count(*) FROM users WHERE active)::int AS users
   `)
 

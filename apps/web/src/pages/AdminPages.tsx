@@ -30,9 +30,25 @@ export function AdminPage() {
       <h2 className="mb-2 mt-4 text-xs font-bold uppercase tracking-wider text-slate-400">Indicadores da Cidade</h2>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Ruas cadastradas" value={data?.streets} />
-        <Stat label="Com geometria" value={data?.verifiedStreets} />
+        <Stat label="Nomes verificados" value={data?.verifiedStreets} />
+        <Stat label="Ruas com geometria" value={data?.streetsWithGeometry} />
+        <Stat label="Geometrias verificadas" value={data?.geometryVerifiedStreets} />
         <Stat label="Sem geometria" value={data?.streetsWithoutGeometry} alert={Number(data?.streetsWithoutGeometry) > 0} />
         <Stat label="Sem bairro confirmado" value={data?.streetsWithoutNeighborhood} />
+        <Stat label="Bairros com limite" value={data?.neighborhoodsWithGeometry} />
+        <Stat label="Bairros sem limite" value={data?.neighborhoodsWithoutGeometry} />
+        <Stat label="Endereços numerados" value={data?.addressPoints} />
+        <Stat label="Endereços com coordenada" value={data?.addressPointsWithGeometry} />
+        <Stat label="Endereços sem coordenada" value={data?.addressPointsWithoutGeometry} />
+        <Stat label="Endereços verificados" value={data?.addressPointsVerified} />
+        <Stat label="Locais sem coordenadas" value={data?.placesWithoutCoordinates} />
+        <Stat label="Referências sem coordenadas" value={data?.landmarksWithoutCoordinates} />
+        <Stat label="Vias OSM pendentes" value={data?.pendingOsmRecords} />
+        <Stat label="Conflitos OSM" value={data?.conflictingOsmRecords} alert={Number(data?.conflictingOsmRecords) > 0} />
+        <Stat label="Segmentos pendentes" value={data?.unverifiedStreetSegments} />
+        <Stat label="Geometrias inválidas" value={data?.invalidStreetGeometries} alert={Number(data?.invalidStreetGeometries) > 0} />
+        <Stat label="Nomes duplicados" value={data?.duplicateStreetNames} alert={Number(data?.duplicateStreetNames) > 0} />
+        <Stat label="Geometrias duplicadas" value={data?.duplicateStreetGeometries} alert={Number(data?.duplicateStreetGeometries) > 0} />
         <Stat label="Com nomes antigos" value={data?.streetsWithOldNames} />
         <Stat label="Pontos de referência" value={data?.landmarks ?? data?.places} />
         <Stat label="Referências populares" value={data?.localReferences} />
@@ -150,6 +166,11 @@ export function AdminMapPage() {
     enabled: !!user && can(user.role, 'street:write'),
     queryFn: () => api<{ records: OsmRecord[] }>('/api/v1/admin/cartography/osm-preview?batch=santa-juliana'),
   })
+  const coverage = useQuery({
+    queryKey: ['admin-stats'],
+    enabled: !!user && can(user.role, 'audit:read'),
+    queryFn: () => api<{ stats: Stats }>('/api/v1/admin/stats'),
+  })
   const neighborhoods = useQuery({
     queryKey: ['neighborhoods'],
     queryFn: () => api<{ neighborhoods: Array<{ id: string; name: string }> }>('/api/v1/neighborhoods'),
@@ -170,8 +191,8 @@ export function AdminMapPage() {
     const allOsm = osmRecords.data?.records ?? []
     return {
       totalStreets: allStreets.length,
-      withGeometry: allStreets.filter((s) => s.geometryVerified || s.geometry).length,
-      withoutGeometry: allStreets.filter((s) => !s.geometryVerified && !s.geometry).length,
+      withGeometry: allStreets.filter((s) => Boolean(s.geometry)).length,
+      withoutGeometry: allStreets.filter((s) => !s.geometry).length,
       withoutNeighborhood: allStreets.filter((s) => !s.neighborhoodName || s.neighborhoodStatus !== 'CONFIRMED').length,
       osmPending: allOsm.filter((r) => r.status === 'PENDING').length,
       osmApproved: allOsm.filter((r) => r.status === 'APPROVED').length,
@@ -181,8 +202,8 @@ export function AdminMapPage() {
 
   const filteredStreets = useMemo(() => {
     return (streets.data?.streets ?? []).filter((s) => {
-      if (streetFilter === 'WITHOUT_GEOM' && (s.geometryVerified || s.geometry)) return false
-      if (streetFilter === 'WITH_GEOM' && !s.geometryVerified && !s.geometry) return false
+      if (streetFilter === 'WITHOUT_GEOM' && s.geometry) return false
+      if (streetFilter === 'WITH_GEOM' && !s.geometry) return false
       if (streetFilter === 'WITHOUT_NEIGHBORHOOD' && s.neighborhoodName && s.neighborhoodStatus === 'CONFIRMED') return false
       if (streetSearchTerm.trim()) {
         const term = streetSearchTerm.toLowerCase()
@@ -228,7 +249,7 @@ export function AdminMapPage() {
         return {
           id: s.id,
           coordinates: line.coordinates,
-          color: isSelected ? '#38bdf8' : s.verified ? '#10b981' : '#f0b429',
+          color: isSelected ? '#38bdf8' : s.geometryVerified ? '#10b981' : '#f0b429',
           name: s.officialName,
         }
       })
@@ -317,7 +338,7 @@ export function AdminMapPage() {
           source: 'OpenStreetMap',
         }),
       })
-      setMessage(`Geometria OSM aprovada com sucesso para ${selectedStreet?.officialName ?? 'a via'}. Confiança definida para 100/100.`)
+      setMessage(`Trecho OSM aprovado e agregado à geometria de ${selectedStreet?.officialName ?? 'a via'}. A confiança do nome não foi alterada.`)
       await Promise.all([
         client.invalidateQueries({ queryKey: ['admin-streets'] }),
         client.invalidateQueries({ queryKey: ['admin-osm-preview'] }),
@@ -340,6 +361,7 @@ export function AdminMapPage() {
       })
       setMessage('Geometria rejeitada no lote.')
       await client.invalidateQueries({ queryKey: ['admin-osm-preview'] })
+      await client.invalidateQueries({ queryKey: ['admin-stats'] })
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao rejeitar')
     } finally {
@@ -362,6 +384,7 @@ export function AdminMapPage() {
       await Promise.all([
         client.invalidateQueries({ queryKey: ['admin-streets'] }),
         client.invalidateQueries({ queryKey: ['admin-osm-preview'] }),
+        client.invalidateQueries({ queryKey: ['admin-stats'] }),
       ])
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao mesclar')
@@ -390,6 +413,7 @@ export function AdminMapPage() {
       await Promise.all([
         client.invalidateQueries({ queryKey: ['admin-streets'] }),
         client.invalidateQueries({ queryKey: ['admin-osm-preview'] }),
+        client.invalidateQueries({ queryKey: ['admin-stats'] }),
       ])
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao criar nova via')
@@ -408,6 +432,7 @@ export function AdminMapPage() {
       })
       setMessage('Registro marcado como CONFLITO.')
       await client.invalidateQueries({ queryKey: ['admin-osm-preview'] })
+      await client.invalidateQueries({ queryKey: ['admin-stats'] })
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao marcar conflito')
     } finally {
@@ -432,6 +457,7 @@ export function AdminMapPage() {
       })
       setMessage(`Bairro confirmado para ${selectedStreet.officialName}!`)
       await client.invalidateQueries({ queryKey: ['admin-streets'] })
+      await client.invalidateQueries({ queryKey: ['admin-stats'] })
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao confirmar bairro')
     } finally {
@@ -455,6 +481,7 @@ export function AdminMapPage() {
         }),
       })
       setMessage(`Sentido de circulação (${segmentDirection}) registrado e verificado!`)
+      await client.invalidateQueries({ queryKey: ['admin-stats'] })
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Falha ao salvar sentido')
     } finally {
@@ -503,7 +530,10 @@ export function AdminMapPage() {
       setMessage('Rua criada com sucesso!')
     }
     setPoints([])
-    await client.invalidateQueries({ queryKey: ['admin-streets'] })
+    await Promise.all([
+      client.invalidateQueries({ queryKey: ['admin-streets'] }),
+      client.invalidateQueries({ queryKey: ['admin-stats'] }),
+    ])
   }
 
   if (!user) return <Navigate to="/entrar" replace />
@@ -570,6 +600,18 @@ export function AdminMapPage() {
             <span className="font-bold text-amber-300">{summary.withoutNeighborhood}</span>
           </div>
         </div>
+        {coverage.data?.stats ? (
+          <div className="grid grid-cols-2 gap-2 border-t border-white/5 bg-black/15 px-4 py-2 text-[11px] sm:grid-cols-3 lg:grid-cols-6">
+            <div><span className="text-slate-400">Geometrias viárias:</span> <strong className="text-white">{coverage.data.stats.streetsWithGeometry}/{coverage.data.stats.streets}</strong> <span className="text-emerald-300">· {coverage.data.stats.geometryVerifiedStreets} verificadas</span></div>
+            <div><span className="text-slate-400">Sem geometria:</span> <strong className="text-amber-300">{coverage.data.stats.streetsWithoutGeometry}</strong></div>
+            <div><span className="text-slate-400">Sem bairro confirmado:</span> <strong className="text-amber-300">{coverage.data.stats.streetsWithoutNeighborhood}</strong></div>
+            <div><span className="text-slate-400">Limites de bairros:</span> <strong className="text-white">{coverage.data.stats.neighborhoodsWithGeometry}/{coverage.data.stats.neighborhoods}</strong></div>
+            <div><span className="text-slate-400">Endereços com coordenada:</span> <strong className="text-white">{coverage.data.stats.addressPointsWithGeometry}/{coverage.data.stats.addressPoints}</strong> <span className="text-emerald-300">· {coverage.data.stats.addressPointsVerified} verificados</span></div>
+            <div><span className="text-slate-400">Pontos sem coordenada:</span> <strong className="text-amber-300">{coverage.data.stats.placesWithoutCoordinates}</strong></div>
+          </div>
+        ) : coverage.isError ? (
+          <p className="border-t border-white/5 bg-black/15 px-4 py-2 text-[11px] text-red-300">Não foi possível carregar as métricas de cobertura do banco.</p>
+        ) : null}
       </header>
 
       {/* Mapa Central */}
@@ -588,11 +630,11 @@ export function AdminMapPage() {
         <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-col gap-1 rounded-xl bg-slate-900/90 p-2 text-[11px] shadow-lg backdrop-blur">
           <div className="flex items-center gap-2">
             <span className="h-2 w-4 rounded-full bg-[#10b981]" />
-            <span>Multivus (Verificada 100%)</span>
+            <span>Multivus (geometria verificada)</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-4 rounded-full bg-[#f0b429]" />
-            <span>Multivus (Sem geometria / 70%)</span>
+            <span>Multivus (geometria pendente)</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-4 rounded-full bg-[#a855f7]" />
@@ -780,8 +822,8 @@ export function AdminMapPage() {
                       </div>
                       <div>
                         <span className="text-slate-400 text-[11px] block">Geometria</span>
-                        <span className={`font-medium ${selectedStreet?.geometryVerified ? 'text-emerald-400' : 'text-amber-400'}`}>
-                          {selectedStreet?.geometryVerified ? '✅ Verificada (OSM)' : '⏳ Pendente'}
+                        <span className={`font-medium ${selectedStreet?.geometryVerified ? 'text-emerald-400' : selectedStreet?.geometry ? 'text-amber-400' : 'text-slate-400'}`}>
+                          {selectedStreet?.geometryVerified ? '✅ Geometria verificada' : selectedStreet?.geometry ? '⏳ Geometria pendente' : 'Sem geometria'}
                         </span>
                       </div>
                     </div>
@@ -789,8 +831,8 @@ export function AdminMapPage() {
                     {/* Fontes independentes */}
                     <div className="rounded-xl bg-black/30 p-2.5 border border-white/5 space-y-1 text-[11px]">
                       <div className="text-slate-400 font-semibold uppercase text-[10px] tracking-wide">Fontes dos Dados:</div>
-                      <div>• Nome: <span className="text-slate-300">{selectedStreet?.source || 'Prefeitura Santa Juliana 2021'}</span></div>
-                      <div>• Geometria: <span className="text-slate-300">{selectedStreet?.geometrySource || 'OpenStreetMap 2026'}</span></div>
+                      <div>• Nome: <span className="text-slate-300">{selectedStreet?.source || 'Não registrado'}</span></div>
+                      <div>• Geometria: <span className="text-slate-300">{selectedStreet?.geometrySource || 'Não registrado'}</span></div>
                       <div>• Bairro: <span className="text-slate-300">{selectedStreet?.neighborhoodSource || 'Não conferido'}</span></div>
                     </div>
 
@@ -827,7 +869,7 @@ export function AdminMapPage() {
                             <option value="">Selecione a rua do Multivus...</option>
                             {(streets.data?.streets ?? []).map((s) => (
                               <option key={s.id} value={s.id}>
-                                {s.officialName} ({s.geometryVerified ? 'Com geom' : 'Sem geom'})
+                                {s.officialName} ({s.geometry ? 'Com geometria' : 'Sem geometria'})
                               </option>
                             ))}
                           </select>
@@ -955,7 +997,7 @@ export function AdminMapPage() {
                 </div>
                 <div className="flex items-center gap-3 text-xs">
                   <span className="text-slate-400">Exibindo: <strong className="text-white">{filteredStreets.length}</strong></span>
-                  <span className="text-emerald-400">Verificadas: <strong>{summary.withGeometry}</strong></span>
+                  <span className="text-emerald-400">Com geometria: <strong>{summary.withGeometry}</strong></span>
                 </div>
               </div>
 
@@ -973,15 +1015,15 @@ export function AdminMapPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-white">{street.officialName}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${street.geometryVerified ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
-                        {street.geometryVerified ? '100% VERIFICADA' : 'SEM GEOM'}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${street.geometryVerified ? 'bg-emerald-500/20 text-emerald-300' : street.geometry ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-500/20 text-slate-300'}`}>
+                        {street.geometryVerified ? 'GEOMETRIA VERIFICADA' : street.geometry ? 'GEOMETRIA PENDENTE' : 'SEM GEOMETRIA'}
                       </span>
                     </div>
                     <div className="mt-1 text-slate-400 text-[11px]">
                       Bairro: {street.neighborhoodName || 'Não confirmado'}
                     </div>
                     <div className="mt-0.5 text-slate-500 text-[10px]">
-                      Fonte: {street.source || 'Prefeitura Santa Juliana'} ({street.sourceDate || '2021'})
+                      Fonte: {street.source || 'Não registrada'}{street.sourceDate ? ` (${street.sourceDate})` : ''}
                     </div>
                   </button>
                 ))}
@@ -1169,10 +1211,26 @@ type Stats = {
   pendingCorrections: number
   streets: number
   verifiedStreets: number
+  streetsWithGeometry?: number
+  geometryVerifiedStreets?: number
   streetsWithoutGeometry: number
   streetsWithoutNeighborhood?: number
   streetsWithOldNames?: number
   neighborhoods: number
+  neighborhoodsWithGeometry?: number
+  neighborhoodsWithoutGeometry?: number
+  addressPoints?: number
+  addressPointsWithGeometry?: number
+  addressPointsWithoutGeometry?: number
+  addressPointsVerified?: number
+  placesWithoutCoordinates?: number
+  landmarksWithoutCoordinates?: number
+  pendingOsmRecords?: number
+  conflictingOsmRecords?: number
+  unverifiedStreetSegments?: number
+  invalidStreetGeometries?: number
+  duplicateStreetNames?: number
+  duplicateStreetGeometries?: number
   places: number
   landmarks?: number
   localReferences?: number
@@ -1228,4 +1286,3 @@ type OsmRecord = {
   tags: Record<string, string> | null
   createdAt: string
 }
-

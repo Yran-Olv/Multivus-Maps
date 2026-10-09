@@ -204,7 +204,11 @@ export const osmImportRecords = pgTable('osm_import_records', {
   reviewedBy: uuid('reviewed_by').references(() => users.id),
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (table) => [
+  uniqueIndex('osm_import_records_batch_osm_id_unique')
+    .on(table.batchName, table.osmId)
+    .where(sql`${table.osmId} IS NOT NULL`),
+])
 
 export const places = pgTable('places', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -403,4 +407,3 @@ export const schema = {
 }
 
 export const geoJsonColumn = sql`ST_AsGeoJSON(geometry)::json`
-

@@ -11,6 +11,7 @@ export async function generateAndSaveReport(
   sourceFile: string,
   results: MatchResult[],
   reportsDir?: string,
+  processing?: { inputFeatures: number; outsideBoundary: number; clippedAtBoundary: number },
 ): Promise<{ report: ImportReport; filePath: string }> {
   const targetDir = reportsDir || resolve(process.cwd(), 'data/import/reports')
   await mkdir(targetDir, { recursive: true })
@@ -45,6 +46,7 @@ export async function generateAndSaveReport(
     sourceFile,
     generatedAt: new Date().toISOString(),
     summary,
+    processing,
     items,
   }
 

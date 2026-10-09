@@ -6,7 +6,7 @@ import { normalizeAddress } from '@multivus/map-core'
 import { parseLocalMapFile } from './parser'
 import { matchOsmWithMultivus } from './matcher'
 import { generateAndSaveReport, loadReport } from './report'
-import type { ImportReport, MatchResult, MultivusStreetCandidate } from './types'
+import type { ImportReport, MatchResult, MultivusStreetCandidate, OsmGeometry } from './types'
 
 function loadEnv(): void {
   if (process.env.DATABASE_URL) return
@@ -31,13 +31,13 @@ function loadEnv(): void {
 }
 
 /**
- * Carrega ruas do banco ou, se indisponível, do seed local
+ * Uses the seed only for an intentional offline preview without DATABASE_URL.
  */
 async function loadCandidates(connectionString?: string): Promise<{ candidates: MultivusStreetCandidate[]; pool?: pg.Pool }> {
   const url = connectionString || process.env.DATABASE_URL
   if (url) {
+    const pool = new pg.Pool({ connectionString: url })
     try {
-      const pool = new pg.Pool({ connectionString: url })
       const res = await pool.query<{
         id: string
         official_name: string
@@ -93,8 +93,9 @@ async function loadCandidates(connectionString?: string): Promise<{ candidates: 
       }))
 
       return { candidates, pool }
-    } catch {
-      // Falha de conexão: fallback para seed
+    } catch (error) {
+      await pool.end()
+      throw new Error('Não foi possível carregar o cadastro cartográfico do banco configurado.', { cause: error })
     }
   }
 
@@ -129,93 +130,236 @@ async function loadCandidates(connectionString?: string): Promise<{ candidates: 
 /**
  * 1. IMPORTAÇÃO
  * Executa o importador OSM sem alterar automaticamente as ruas oficiais.
- * Salva relatório em data/import/reports/<batchName>.json e na tabela osm_import_records.
+ * Salva um relatório e só persiste no staging quando solicitado explicitamente.
  */
 export async function importOsm(options: {
   filePath: string
   batchName?: string
   connectionString?: string
+  boundaryFilePath?: string
+  persistStaging?: boolean
+  reportsDir?: string
 }): Promise<{ report: ImportReport; reportPath: string }> {
   loadEnv()
+  if (options.persistStaging && !options.boundaryFilePath) {
+    throw new Error('A persistência do staging exige o limite municipal em --boundary.')
+  }
   const batchName = options.batchName || 'santa-juliana'
   const resolvedPath = resolve(process.cwd(), options.filePath)
 
   console.log(`[map:import] Lendo arquivo cartográfico: ${resolvedPath}`)
-  const osmFeatures = await parseLocalMapFile(resolvedPath)
-  console.log(`[map:import] ${osmFeatures.length} vias extraídas do OpenStreetMap.`)
+  const inputFeatures = await parseLocalMapFile(resolvedPath)
+  console.log(`[map:import] ${inputFeatures.length} vias extraídas do OpenStreetMap.`)
 
   console.log(`[map:import] Carregando cadastro oficial do Multivus Maps...`)
   const { candidates, pool } = await loadCandidates(options.connectionString)
   console.log(`[map:import] ${candidates.length} vias candidatas no Multivus Maps.`)
 
-  console.log(`[map:import] Executando algoritmo de matching em 6 etapas...`)
-  const results: MatchResult[] = []
-
-  for (const feat of osmFeatures) {
-    const match = matchOsmWithMultivus(feat, candidates)
-    results.push(match)
-  }
-
-  const { report, filePath } = await generateAndSaveReport(batchName, resolvedPath, results)
-  console.log(`[map:import] Relatório gerado com sucesso em: ${filePath}`)
-
-  // Grava staging na tabela osm_import_records se o banco estiver disponível
-  if (pool) {
-    try {
-      const client = await pool.connect()
-      try {
-        await client.query('BEGIN')
-        // Limpa registros anteriores deste lote
-        await client.query('DELETE FROM osm_import_records WHERE batch_name = $1', [batchName])
-
-        for (const res of results) {
-          const geomJson = JSON.stringify(res.osmFeature.geometry)
-          await client.query(
-            `INSERT INTO osm_import_records (
-               batch_name, osm_id, source_name, normalized_source_name, street_type,
-               geometry, multivus_street_id, match_type, score, status, conflicts, tags
-             ) VALUES (
-               $1, $2, $3, $4, $5,
-               ST_SetSRID(ST_GeomFromGeoJSON($6), 4326),
-               $7, $8, $9, 'PENDING', $10, $11
-             )`,
-            [
-              batchName,
-              res.osmFeature.osmId,
-              res.osmFeature.name,
-              res.osmFeature.normalizedName,
-              res.osmFeature.streetType ?? null,
-              geomJson,
-              res.multivusStreetId && !res.multivusStreetId.startsWith('seed-') ? res.multivusStreetId : null,
-              res.matchType,
-              res.score,
-              res.conflicts.length > 0 ? JSON.stringify(res.conflicts) : null,
-              JSON.stringify(res.osmFeature.tags),
-            ],
-          )
-        }
-        await client.query('COMMIT')
-        console.log(`[map:import] ${results.length} registros gravados em osm_import_records no banco de dados.`)
-      } catch (err) {
-        await client.query('ROLLBACK')
-        console.warn(`[map:import] Aviso: falha ao persistir staging no banco:`, err)
-      } finally {
-        client.release()
+  try {
+    let osmFeatures = inputFeatures
+    let outsideBoundary = 0
+    let clippedAtBoundary = 0
+    if (options.boundaryFilePath) {
+      if (!pool) {
+        throw new Error('O recorte por limite municipal requer DATABASE_URL com PostGIS disponível.')
       }
-    } finally {
-      await pool.end()
+      const clipped = await clipFeaturesToBoundary(inputFeatures, resolve(process.cwd(), options.boundaryFilePath), pool)
+      osmFeatures = clipped.features
+      outsideBoundary = clipped.outsideBoundary
+      clippedAtBoundary = clipped.clippedAtBoundary
     }
+
+    console.log(`[map:import] ${osmFeatures.length} vias após validação/recorte territorial.`)
+    console.log(`[map:import] Executando algoritmo de matching em 6 etapas...`)
+    const results: MatchResult[] = osmFeatures.map((feature) => matchOsmWithMultivus(feature, candidates))
+
+    const { report, filePath } = await generateAndSaveReport(
+      batchName,
+      resolvedPath,
+      results,
+      options.reportsDir,
+      options.boundaryFilePath
+        ? { inputFeatures: inputFeatures.length, outsideBoundary, clippedAtBoundary }
+        : undefined,
+    )
+    console.log(`[map:import] Relatório gerado em: ${filePath}`)
+
+    if (options.persistStaging) {
+      if (!pool) {
+        throw new Error('DATABASE_URL é obrigatório para persistir os registros de revisão.')
+      }
+      await persistStaging(pool, batchName, results)
+      console.log(`[map:import] ${results.length} registros atualizados no staging; decisões de revisão existentes foram preservadas.`)
+    } else {
+      console.log('[map:import] Simulação concluída; nenhum registro foi gravado no banco.')
+    }
+
+    return { report, reportPath: filePath }
+  } finally {
+    await pool?.end()
+  }
+}
+
+async function clipFeaturesToBoundary(
+  features: Awaited<ReturnType<typeof parseLocalMapFile>>,
+  boundaryFilePath: string,
+  pool: pg.Pool,
+): Promise<{ features: typeof features; outsideBoundary: number; clippedAtBoundary: number }> {
+  const boundaryDocument = JSON.parse(readFileSync(boundaryFilePath, 'utf8')) as {
+    type?: string
+    features?: Array<{ geometry?: { type?: string } }>
+    geometry?: { type?: string }
+  }
+  if (boundaryDocument.type === 'FeatureCollection' && boundaryDocument.features?.length !== 1) {
+    throw new Error('O GeoJSON de limite deve conter exatamente uma feição municipal.')
+  }
+  const boundary = boundaryDocument.type === 'FeatureCollection'
+    ? boundaryDocument.features?.[0]?.geometry
+    : boundaryDocument.type === 'Feature'
+      ? (boundaryDocument as { geometry?: { type?: string } }).geometry
+      : boundaryDocument
+  if (!boundary || !['Polygon', 'MultiPolygon'].includes(boundary.type ?? '')) {
+    throw new Error('O arquivo de limite deve conter uma geometria Polygon ou MultiPolygon em GeoJSON.')
   }
 
-  return { report, reportPath: filePath }
+  const boundaryCheck = await pool.query<{ valid: boolean }>(
+    `SELECT ST_IsValid(geom)
+       AND GeometryType(geom) IN ('POLYGON', 'MULTIPOLYGON')
+       AND ST_XMin(Box3D(geom)) >= -180
+       AND ST_XMax(Box3D(geom)) <= 180
+       AND ST_YMin(Box3D(geom)) >= -90
+       AND ST_YMax(Box3D(geom)) <= 90 AS valid
+     FROM (SELECT ST_SetSRID(ST_GeomFromGeoJSON($1), 4326) AS geom) AS boundary`,
+    [JSON.stringify(boundary)],
+  )
+  if (boundaryCheck.rows[0]?.valid !== true) {
+    throw new Error('O limite municipal GeoJSON é inválido segundo o PostGIS.')
+  }
+
+  const rows = await pool.query<{ osm_id: string; geometry: OsmGeometry | null; fully_inside: boolean }>(
+    `WITH boundary AS (
+       SELECT ST_SetSRID(ST_GeomFromGeoJSON($1), 4326) AS geom
+     ), validation AS (
+       SELECT geom
+       FROM boundary
+       WHERE ST_IsValid(geom)
+         AND GeometryType(geom) IN ('POLYGON', 'MULTIPOLYGON')
+     ), source AS (
+       SELECT osm_id, ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326) AS geom
+       FROM jsonb_to_recordset($2::jsonb) AS item(osm_id text, geometry jsonb)
+     ), clipped AS (
+       SELECT source.osm_id,
+         ST_CoveredBy(source.geom, validation.geom) AS fully_inside,
+         ST_Multi(ST_CollectionExtract(ST_Intersection(source.geom, validation.geom), 2)) AS geom
+       FROM source
+       CROSS JOIN validation
+       WHERE ST_IsValid(source.geom)
+         AND GeometryType(source.geom) IN ('LINESTRING', 'MULTILINESTRING')
+         AND ST_Intersects(source.geom, validation.geom)
+     )
+     SELECT osm_id, fully_inside, ST_AsGeoJSON(geom)::json AS geometry
+     FROM clipped
+     WHERE NOT ST_IsEmpty(geom) AND ST_IsValid(geom)`,
+    [
+      JSON.stringify(boundary),
+      JSON.stringify(features.map((feature) => ({ osm_id: feature.osmId, geometry: feature.geometry }))),
+    ],
+  )
+  if (rows.rowCount === null) {
+    throw new Error('O PostGIS não retornou a contagem de vias recortadas.')
+  }
+  const clipped = new Map(rows.rows.map((row) => [row.osm_id, row.geometry]))
+  const result = features.flatMap((feature) => {
+    const geometry = clipped.get(feature.osmId)
+    return geometry ? [{ ...feature, geometry }] : []
+  })
+  return {
+    features: result,
+    outsideBoundary: features.length - rows.rows.length,
+    clippedAtBoundary: rows.rows.filter((row) => !row.fully_inside).length,
+  }
+}
+
+async function persistStaging(pool: pg.Pool, batchName: string, results: MatchResult[]): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    for (const result of results) {
+      await client.query(
+        `INSERT INTO osm_import_records (
+           batch_name, osm_id, source_name, normalized_source_name, street_type,
+           geometry, multivus_street_id, match_type, score, status, conflicts, tags
+         ) VALUES (
+           $1, $2, $3, $4, $5,
+           ST_SetSRID(ST_GeomFromGeoJSON($6), 4326),
+           $7, $8, $9, 'PENDING', $10, $11
+         )
+         ON CONFLICT (batch_name, osm_id) WHERE osm_id IS NOT NULL
+         DO UPDATE SET
+           source_name = EXCLUDED.source_name,
+           normalized_source_name = EXCLUDED.normalized_source_name,
+           street_type = EXCLUDED.street_type,
+           geometry = EXCLUDED.geometry,
+           multivus_street_id = EXCLUDED.multivus_street_id,
+           match_type = EXCLUDED.match_type,
+           score = EXCLUDED.score,
+           conflicts = EXCLUDED.conflicts,
+           tags = EXCLUDED.tags,
+           status = CASE
+             WHEN osm_import_records.status IN ('APPROVED', 'REJECTED', 'MERGED', 'CONFLICT')
+               AND ST_Equals(osm_import_records.geometry, EXCLUDED.geometry)
+               AND osm_import_records.tags = EXCLUDED.tags
+               AND osm_import_records.source_name = EXCLUDED.source_name
+               AND osm_import_records.multivus_street_id IS NOT DISTINCT FROM EXCLUDED.multivus_street_id
+             THEN osm_import_records.status
+             ELSE 'PENDING'
+           END,
+           reviewed_by = CASE
+             WHEN ST_Equals(osm_import_records.geometry, EXCLUDED.geometry)
+               AND osm_import_records.tags = EXCLUDED.tags
+               AND osm_import_records.source_name = EXCLUDED.source_name
+               AND osm_import_records.multivus_street_id IS NOT DISTINCT FROM EXCLUDED.multivus_street_id
+             THEN osm_import_records.reviewed_by
+             ELSE NULL
+           END,
+           reviewed_at = CASE
+             WHEN ST_Equals(osm_import_records.geometry, EXCLUDED.geometry)
+               AND osm_import_records.tags = EXCLUDED.tags
+               AND osm_import_records.source_name = EXCLUDED.source_name
+               AND osm_import_records.multivus_street_id IS NOT DISTINCT FROM EXCLUDED.multivus_street_id
+             THEN osm_import_records.reviewed_at
+             ELSE NULL
+           END`,
+        [
+          batchName,
+          result.osmFeature.osmId,
+          result.osmFeature.name,
+          result.osmFeature.normalizedName,
+          result.osmFeature.streetType ?? null,
+          JSON.stringify(result.osmFeature.geometry),
+          result.multivusStreetId && !result.multivusStreetId.startsWith('seed-') ? result.multivusStreetId : null,
+          result.matchType,
+          result.score,
+          result.conflicts.length > 0 ? JSON.stringify(result.conflicts) : null,
+          JSON.stringify(result.osmFeature.tags),
+        ],
+      )
+    }
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 /**
  * 2. PRÉ-VISUALIZAÇÃO
  * Exibe o relatório de importação formatado no terminal
  */
-export async function previewReport(batchName: string): Promise<ImportReport> {
-  const report = await loadReport(batchName)
+export async function previewReport(batchName: string, reportsDir?: string): Promise<ImportReport> {
+  const report = await loadReport(batchName, reportsDir)
 
   console.log(`\n==================================================`)
   console.log(`RELATÓRIO DE CONFERÊNCIA CARTOGRÁFICA: ${report.batchName.toUpperCase()}`)
@@ -225,6 +369,11 @@ export async function previewReport(batchName: string): Promise<ImportReport> {
 
   console.log(`RESUMO:`)
   console.log(`- Total de vias OSM processadas: ${report.summary.totalOsmFeatures}`)
+  if (report.processing) {
+    console.log(`- Feições lidas: ${report.processing.inputFeatures}`)
+    console.log(`- Fora do limite municipal: ${report.processing.outsideBoundary}`)
+    console.log(`- Recortadas no limite municipal: ${report.processing.clippedAtBoundary}`)
+  }
   console.log(`  ✓ MATCH_EXACT  (Correspondência oficial exata): ${report.summary.exact}`)
   console.log(`  ✓ MATCH_ALIAS  (Correspondência via nome antigo/popular): ${report.summary.alias}`)
   console.log(`  ~ MATCH_FUZZY  (Correspondência aproximada / digitação): ${report.summary.fuzzy}`)
@@ -256,8 +405,8 @@ export async function previewReport(batchName: string): Promise<ImportReport> {
   }
 
   console.log(`\nPróximo passo:`)
-  console.log(`- Para aprovar correspondências exatas com segurança: pnpm map:apply ${batchName} --exact-only`)
-  console.log(`- Para revisar e aprovar visualmente no mapa: acesse /admin/mapa`)
+  console.log(`- Revise cada geometria e aprove os candidatos no painel /admin/mapa antes de aplicar.`)
+  console.log(`- Depois da revisão, opcionalmente sincronize os itens aprovados: pnpm map:apply ${batchName}`)
   console.log(`==================================================\n`)
 
   return report
@@ -271,7 +420,6 @@ export async function applyReport(
   batchName: string,
   options?: {
     exactOnly?: boolean
-    approvedIds?: string[]
     connectionString?: string
     userId?: string
   },
@@ -299,26 +447,41 @@ export async function applyReport(
 
     const eligible = report.items.filter((item) => {
       if (!item.multivus_street_id || item.multivus_street_id.startsWith('seed-')) return false
-      if (options?.approvedIds?.includes(item.multivus_street_id)) return true
-      if (options?.exactOnly) {
-        return item.match_type === 'MATCH_EXACT'
-      }
-      return item.match_type === 'MATCH_EXACT'
+      return !options?.exactOnly || item.match_type === 'MATCH_EXACT'
     })
 
-    console.log(`[map:apply] Aplicando geometria para ${eligible.length} via(s) aprovada(s)...`)
+    console.log(`[map:apply] Conferindo ${eligible.length} candidato(s) para sincronizar; somente itens já aprovados serão aplicados...`)
 
     for (const item of eligible) {
       const geomJson = JSON.stringify(item.geometry)
       const streetId = item.multivus_street_id!
+      const review = await client.query<{ status: string; multivus_street_id: string | null }>(
+        `SELECT status, multivus_street_id
+         FROM osm_import_records
+         WHERE batch_name = $1 AND osm_id = $2`,
+        [batchName, item.osm_id],
+      )
+      if (review.rows[0]?.status !== 'APPROVED' || review.rows[0].multivus_street_id !== streetId) {
+        continue
+      }
 
-      // A aprovação desta importação valida a geometria, não o nome nem os números prediais.
       const updateRes = await client.query<{ id: string; official_name: string }>(
         `UPDATE streets
-         SET geometry = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326),
-             geometry_source = 'OpenStreetMap',
+         SET geometry = ST_Multi(ST_CollectionExtract(
+               CASE
+                 WHEN streets.geometry IS NULL THEN imported.geometry
+                 ELSE ST_UnaryUnion(ST_Collect(streets.geometry, imported.geometry))
+               END,
+               2
+             )),
+             geometry_source = CASE
+               WHEN streets.geometry IS NULL OR streets.geometry_source = 'OpenStreetMap'
+                 THEN 'OpenStreetMap'
+               ELSE 'Múltiplas fontes'
+             END,
              geometry_source_date = to_char(now(), 'YYYY-MM-DD'),
              geometry_verified = true
+         FROM (SELECT ST_SetSRID(ST_GeomFromGeoJSON($1), 4326) AS geometry) imported
          WHERE id = $2
          RETURNING id, official_name`,
         [geomJson, streetId],
@@ -330,8 +493,14 @@ export async function applyReport(
         // Cria segmento de rua caso ainda não exista
         await client.query(
           `INSERT INTO street_segments (street_id, geometry, direction, verified, source)
-           VALUES ($1, ST_SetSRID(ST_GeomFromGeoJSON($2), 4326), 'BOTH', false, 'OpenStreetMap')
-           ON CONFLICT DO NOTHING`,
+           SELECT $1, imported.geometry, 'BOTH', false, 'OpenStreetMap'
+           FROM (SELECT ST_SetSRID(ST_GeomFromGeoJSON($2), 4326) AS geometry) imported
+           WHERE NOT EXISTS (
+             SELECT 1
+             FROM street_segments existing
+             WHERE existing.street_id = $1
+               AND ST_Equals(existing.geometry, imported.geometry)
+           )`,
           [streetId, geomJson],
         )
 
@@ -359,14 +528,14 @@ export async function applyReport(
         await client.query(
           `UPDATE osm_import_records
            SET status = 'APPROVED', reviewed_by = $1, reviewed_at = now()
-           WHERE batch_name = $2 AND multivus_street_id = $3`,
-          [userId ?? null, batchName, streetId],
+           WHERE batch_name = $2 AND osm_id = $3 AND status = 'APPROVED'`,
+          [userId ?? null, batchName, item.osm_id],
         )
       }
     }
 
     await client.query('COMMIT')
-    console.log(`[map:apply] Concluído! ${appliedCount} rua(s) atualizada(s) com geometria OSM e verificadas com score 100.`)
+    console.log(`[map:apply] Concluído. ${appliedCount} geometria(s) sincronizada(s) após aprovação humana.`)
   } catch (error) {
     await client.query('ROLLBACK')
     throw error

@@ -57,19 +57,25 @@ O PDF **não é georreferenciado**. Não possui sistema de coordenadas EPSG proj
 
 A geometria das vias é importada a partir de extrações reais do OpenStreetMap através do pacote `@multivus/map-import`.
 
-1. **Extração:** Formatos `.osm`, `.osm.pbf`, `.geojson` ou `.gpkg`.
+1. **Entrada:** OpenStreetMap XML (`.osm`) ou GeoJSON (`.geojson`/`.json`). PBF e GeoPackage precisam ser convertidos previamente.
 2. **Normalização & Matching:** Algoritmo ponderado de 6 critérios (`MATCH_EXACT`, `MATCH_ALIAS`, `MATCH_FUZZY`, `CONFLICT`, `NEW_STREET`, `UNRESOLVED`).
-3. **Staging:** Armazenamento em `osm_import_records`.
-4. **Inspeção Humana:** Painel de Conferência Cartográfica em `/admin/mapa`.
-5. **Aprovação:** Apenas vias aprovadas por editor recebem `geometry_verified = true` e `confidence_score = 100`.
+3. **Simulação:** O comando gera um relatório e não grava no banco por padrão.
+4. **Limite municipal:** Para persistir candidatos, é obrigatório fornecer um polígono municipal GeoJSON; o recorte e a validade são verificados pelo PostGIS.
+5. **Staging:** `--persist-staging` atualiza `osm_import_records` idempotentemente e preserva decisões humanas quando a geometria e a associação não mudaram.
+6. **Inspeção Humana:** Painel de Conferência Cartográfica em `/admin/mapa`.
+7. **Aprovação:** A revisão cartográfica pode confirmar a geometria da via, não o nome, o número predial ou a entrada de um imóvel. Trechos aprovados são acumulados na geometria da rua, mantendo segmentos e fontes individuais; sentidos permanecem pendentes até verificação local. A confiança do nome não deve ser elevada apenas pela aprovação da geometria.
+
+Consulte [`IMPORT_OSM.md`](./IMPORT_OSM.md) para comandos e opções. Dados derivados do OSM precisam manter a atribuição e cumprir a ODbL.
 
 ---
 
 ## 4. Integração Futura: CNEFE / IBGE
 
-Para localização exata de portas e números prediais:
-- A tabela `address_points` (`id`, `street_id`, `number`, `geometry`, `source`, `verified`, `confidence_score`) está estruturada para receber as coordenadas das faces de quadra do CNEFE (Cadastro Nacional de Endereços para Fins Estatísticos) do Censo IBGE.
-- Permite que o entregador que busca `"Rua Orivaldo José Pires, 120"` trace a rota até a frente do lote, e não apenas ao centroide da rua.
+O arquivo municipal do CNEFE 2022 consultado no diretório oficial do IBGE contém 7.876 pontos. Na verificação espacial, 7.874 ficaram dentro da malha municipal utilizada. Uma análise exploratória do campo combinado `LOGRAD_NUM` encontrou 5.719 textos dos quais o parser extraiu número; 4.915 registros tiveram correspondência textual exata com nome ou alias ativo, e 4.270 combinaram correspondência textual e número extraído. Esses números são candidatos de análise, não endereços validados.
+
+O CNEFE ainda não foi importado para `address_points`: 525 identificadores externos aparecem repetidos (527 linhas excedentes), o significado dos códigos `NV_GEO_COORD` não foi confirmado no dicionário, e as condições específicas de reutilização/atribuição precisam de confirmação antes da persistência. Portanto, **há zero pontos prediais no banco** e nenhum desses dados deve ser tratado como entrada residencial verificada.
+
+Receita Federal: nenhum arquivo de estabelecimentos foi obtido ou processado nesta auditoria; endereço cadastral textual, por si só, não fornece coordenada precisa.
 
 ---
 
