@@ -33,8 +33,8 @@ export function readConfig(): AppConfig {
   const databaseUrl = required('DATABASE_URL')
   const accessSecret = required('JWT_ACCESS_SECRET')
   const refreshSecret = required('JWT_REFRESH_SECRET')
-  if (accessSecret.length < 16 || refreshSecret.length < 16) {
-    throw new Error('JWT_ACCESS_SECRET e JWT_REFRESH_SECRET precisam ter pelo menos 16 caracteres.')
+  if (accessSecret.length < 32 || refreshSecret.length < 32) {
+    throw new Error('JWT_ACCESS_SECRET e JWT_REFRESH_SECRET precisam ter pelo menos 32 caracteres (256 bits).')
   }
   return {
     host: process.env.API_HOST ?? '0.0.0.0',
